@@ -40,7 +40,7 @@ from .coordinator import OpenAlarmCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.BUTTON]
+PLATFORMS: list[Platform] = []
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -115,19 +115,10 @@ def _async_sync_devices(
     offering controls that would 404.
     """
     registry = dr.async_get(hass)
-    location_id = entry.data[CONF_LOCATION_ID]
     location_name = (
-        coordinator.location_name or entry.data.get(CONF_LOCATION_NAME) or location_id
-    )
-
-    registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, f"location:{location_id}")},
-        name=f"{MANUFACTURER} {location_name}",
-        manufacturer=MANUFACTURER,
-        model="Location",
-        entry_type=dr.DeviceEntryType.SERVICE,
-        configuration_url=APP_URL,
+        coordinator.location_name
+        or entry.data.get(CONF_LOCATION_NAME)
+        or entry.data[CONF_LOCATION_ID]
     )
 
     live: set[str] = set()
@@ -148,14 +139,13 @@ def _async_sync_devices(
                 manufacturer=MANUFACTURER,
                 model=model,
                 entry_type=dr.DeviceEntryType.SERVICE,
-                via_device=(DOMAIN, f"location:{location_id}"),
                 suggested_area=location_name,
                 configuration_url=APP_URL,
             )
 
     for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
         for domain, unique_id in device.identifiers:
-            if domain != DOMAIN or unique_id.startswith("location:"):
+            if domain != DOMAIN:
                 continue
             if unique_id not in live:
                 registry.async_update_device(

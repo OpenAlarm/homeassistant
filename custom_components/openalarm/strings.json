@@ -31,13 +31,6 @@
       "reauth_successful": "OpenAlarm reconnected."
     }
   },
-  "entity": {
-    "button": {
-      "refresh": {
-        "name": "Refresh inventory"
-      }
-    }
-  },
   "services": {
     "alarm_arm": {
       "name": "Arm alarm",

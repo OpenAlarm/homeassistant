@@ -1,11 +1,4 @@
 {
-  "entity": {
-    "button": {
-      "refresh": {
-        "default": "mdi:refresh"
-      }
-    }
-  },
   "services": {
     "alarm_arm": "mdi:shield-lock",
     "alarm_disarm": "mdi:shield-off",
