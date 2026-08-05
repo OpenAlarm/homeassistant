@@ -123,7 +123,7 @@ def _async_sync_devices(
     registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, f"location:{location_id}")},
-        name=location_name,
+        name=f"{MANUFACTURER} {location_name}",
         manufacturer=MANUFACTURER,
         model="Location",
         configuration_url=APP_URL,
