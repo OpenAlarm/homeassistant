@@ -81,13 +81,20 @@ class OpenAlarmPanel(
         )
 
     async def async_added_to_hass(self) -> None:
-        """Restore the last optimistic state across restarts."""
+        """Restore the last optimistic state, or start disarmed.
+
+        A brand-new panel has no history, and rendering "unknown" reads as
+        broken. Disarmed is how core's manual panel and Alarmo both start,
+        and it matches the state a freshly created OpenAlarm alarm holds.
+        """
         await super().async_added_to_hass()
         if (last := await self.async_get_last_state()) is not None:
             try:
                 self._attr_alarm_state = AlarmControlPanelState(last.state)
             except ValueError:
                 self._attr_alarm_state = None
+        if self._attr_alarm_state is None:
+            self._attr_alarm_state = AlarmControlPanelState.DISARMED
 
     @property
     def available(self) -> bool:
