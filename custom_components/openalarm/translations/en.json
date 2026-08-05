@@ -39,8 +39,8 @@
     }
   },
   "services": {
-    "arm": {
-      "name": "Arm",
+    "alarm_arm": {
+      "name": "Arm alarm",
       "description": "Arms an alarm. Leave the mode empty to arm without one.",
       "fields": {
         "device_id": {
@@ -53,8 +53,8 @@
         }
       }
     },
-    "disarm": {
-      "name": "Disarm",
+    "alarm_disarm": {
+      "name": "Disarm alarm",
       "description": "Disarms an alarm.",
       "fields": {
         "device_id": {
@@ -63,8 +63,8 @@
         }
       }
     },
-    "trigger": {
-      "name": "Trigger",
+    "alarm_trigger": {
+      "name": "Trigger alarm",
       "description": "Triggers an alarm, which starts its escalation policy.",
       "fields": {
         "device_id": {
@@ -77,8 +77,8 @@
         }
       }
     },
-    "clear": {
-      "name": "Clear",
+    "alarm_clear": {
+      "name": "Clear alarm",
       "description": "Clears an alarm's open incident.",
       "fields": {
         "device_id": {
@@ -87,8 +87,8 @@
         }
       }
     },
-    "panic": {
-      "name": "Panic trigger",
+    "panic_trigger": {
+      "name": "Trigger panic button",
       "description": "Triggers a panic button.",
       "fields": {
         "device_id": {
@@ -98,7 +98,7 @@
       }
     },
     "panic_clear": {
-      "name": "Panic clear",
+      "name": "Clear panic button",
       "description": "Clears a panic button's open incident.",
       "fields": {
         "device_id": {

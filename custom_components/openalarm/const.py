@@ -15,11 +15,11 @@ CONF_LOCATION_NAME = "location_name"
 
 ATTR_MODE = "mode"
 
-SERVICE_ARM = "arm"
-SERVICE_DISARM = "disarm"
-SERVICE_TRIGGER = "trigger"
-SERVICE_CLEAR = "clear"
-SERVICE_PANIC = "panic"
+SERVICE_ARM = "alarm_arm"
+SERVICE_DISARM = "alarm_disarm"
+SERVICE_TRIGGER = "alarm_trigger"
+SERVICE_CLEAR = "alarm_clear"
+SERVICE_PANIC = "panic_trigger"
 SERVICE_PANIC_CLEAR = "panic_clear"
 
 KIND_ALARM = "alarm"

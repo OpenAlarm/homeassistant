@@ -1,4 +1,4 @@
-arm:
+alarm_arm:
   fields:
     device_id:
       required: true
@@ -21,7 +21,7 @@ arm:
             - away
             - night
 
-disarm:
+alarm_disarm:
   fields:
     device_id:
       required: true
@@ -32,7 +32,7 @@ disarm:
             - integration: openalarm
               model: Alarm
 
-trigger:
+alarm_trigger:
   fields:
     device_id:
       required: true
@@ -55,7 +55,7 @@ trigger:
             - away
             - night
 
-clear:
+alarm_clear:
   fields:
     device_id:
       required: true
@@ -66,7 +66,7 @@ clear:
             - integration: openalarm
               model: Alarm
 
-panic:
+panic_trigger:
   fields:
     device_id:
       required: true

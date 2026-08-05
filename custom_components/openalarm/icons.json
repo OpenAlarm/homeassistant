@@ -7,11 +7,11 @@
     }
   },
   "services": {
-    "arm": "mdi:shield-lock",
-    "disarm": "mdi:shield-off",
-    "trigger": "mdi:bell-ring",
-    "clear": "mdi:bell-check",
-    "panic": "mdi:alarm-light",
+    "alarm_arm": "mdi:shield-lock",
+    "alarm_disarm": "mdi:shield-off",
+    "alarm_trigger": "mdi:bell-ring",
+    "alarm_clear": "mdi:bell-check",
+    "panic_trigger": "mdi:alarm-light",
     "panic_clear": "mdi:alarm-light-off"
   }
 }

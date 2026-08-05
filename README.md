@@ -14,11 +14,11 @@ Six actions:
 
 | Action | What it does |
 |-|-|
-| `openalarm.arm` | Arms an alarm, optionally in a named mode |
-| `openalarm.disarm` | Disarms an alarm |
-| `openalarm.trigger` | Triggers an alarm, starting its escalation policy |
-| `openalarm.clear` | Clears an alarm's open incident |
-| `openalarm.panic` | Triggers a panic button |
+| `openalarm.alarm_arm` | Arms an alarm, optionally in a named mode |
+| `openalarm.alarm_disarm` | Disarms an alarm |
+| `openalarm.alarm_trigger` | Triggers an alarm, starting its escalation policy |
+| `openalarm.alarm_clear` | Clears an alarm's open incident |
+| `openalarm.panic_trigger` | Triggers a panic button |
 | `openalarm.panic_clear` | Clears a panic button's open incident |
 
 Your modes come from your account, including custom ones. Add a mode in the OpenAlarm console and it appears here after the next refresh, with no reinstall.
@@ -62,7 +62,7 @@ automation:
         entity_id: alarm_control_panel.alarmo
         to: "triggered"
     actions:
-      - action: openalarm.trigger
+      - action: openalarm.alarm_trigger
         data:
           device_id: !input openalarm_device
 
@@ -72,7 +72,7 @@ automation:
         entity_id: alarm_control_panel.alarmo
         to: "armed_away"
     actions:
-      - action: openalarm.arm
+      - action: openalarm.alarm_arm
         data:
           device_id: !input openalarm_device
           mode: away
