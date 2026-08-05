@@ -14,6 +14,9 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
 
 from .api import InvalidAuth, OpenAlarmClient, OpenAlarmError
@@ -23,6 +26,11 @@ from .const import (
     CONF_LOCATION_NAME,
     DEFAULT_BASE_URL,
     DOMAIN,
+)
+
+
+API_KEY_SELECTOR = TextSelector(
+    TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
 )
 
 
@@ -64,7 +72,7 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
+            data_schema=vol.Schema({vol.Required(CONF_API_KEY): API_KEY_SELECTOR}),
             errors=errors,
         )
 
@@ -146,7 +154,7 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
+            data_schema=vol.Schema({vol.Required(CONF_API_KEY): API_KEY_SELECTOR}),
             description_placeholders={
                 "location": entry.data.get(CONF_LOCATION_NAME) or entry.title
             },
