@@ -88,7 +88,7 @@
       }
     },
     "panic": {
-      "name": "Panic",
+      "name": "Panic trigger",
       "description": "Triggers a panic button.",
       "fields": {
         "device_id": {
@@ -98,7 +98,7 @@
       }
     },
     "panic_clear": {
-      "name": "Clear panic",
+      "name": "Panic clear",
       "description": "Clears a panic button's open incident.",
       "fields": {
         "device_id": {
