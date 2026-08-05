@@ -1,0 +1,13 @@
+{
+  "domain": "openalarm",
+  "name": "OpenAlarm",
+  "codeowners": ["@aaronfagan"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/OpenAlarm/homeassistant",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/OpenAlarm/homeassistant/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

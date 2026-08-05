@@ -1,0 +1,47 @@
+arm:
+  target:
+    device:
+      integration: openalarm
+      model: Alarm
+  fields:
+    mode:
+      required: false
+      example: away
+      selector:
+        text:
+
+disarm:
+  target:
+    device:
+      integration: openalarm
+      model: Alarm
+
+trigger:
+  target:
+    device:
+      integration: openalarm
+      model: Alarm
+  fields:
+    mode:
+      required: false
+      example: away
+      selector:
+        text:
+
+clear:
+  target:
+    device:
+      integration: openalarm
+      model: Alarm
+
+panic:
+  target:
+    device:
+      integration: openalarm
+      model: Panic Button
+
+panic_clear:
+  target:
+    device:
+      integration: openalarm
+      model: Panic Button

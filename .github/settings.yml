@@ -1,6 +1,6 @@
 repository:
-  name: reference
-  description: OpenAlarm - HomeAssistant
+  name: homeassistant
+  description: Arm, disarm and trigger your OpenAlarm alarms and panic buttons from Home Assistant automations.
   homepage: https://openalarm.io/
   private: true
   has_issues: true
@@ -10,6 +10,15 @@ repository:
   allow_merge_commit: true
   allow_rebase_merge: true
   delete_branch_on_merge: true
+  topics:
+    - home-assistant
+    - homeassistant
+    - hacs
+    - hacs-integration
+    - custom-component
+    - openalarm
+    - alarm
+    - home-automation
 
 labels:
   - name: bug

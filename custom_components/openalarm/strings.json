@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect OpenAlarm",
+        "description": "Create an API key in the OpenAlarm console under API Keys, then paste it here. The key decides which alarms and panic buttons Home Assistant can reach.",
+        "data": {
+          "api_key": "API key",
+          "base_url": "API address"
+        },
+        "data_description": {
+          "base_url": "Leave this alone unless you were told otherwise."
+        }
+      },
+      "location": {
+        "title": "Choose a location",
+        "description": "This key can reach more than one location. Each one is set up separately."
+      },
+      "reauth_confirm": {
+        "title": "Reconnect OpenAlarm",
+        "description": "The key for {location} no longer works. It may have been deleted or disabled. Paste a replacement that can still reach this location.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach OpenAlarm. Check the internet connection and try again.",
+      "invalid_auth": "OpenAlarm rejected that key. Check it was copied whole, and that it is still enabled in the console.",
+      "no_locations": "That key cannot reach any alarms or panic buttons. Check its scope in the console.",
+      "wrong_location": "That key cannot reach this location. Use one scoped to it, or add the other location separately."
+    },
+    "abort": {
+      "already_configured": "This location is already set up.",
+      "reauth_successful": "OpenAlarm reconnected."
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh inventory"
+      }
+    }
+  },
+  "services": {
+    "arm": {
+      "name": "Arm",
+      "description": "Arms an alarm. Leave the mode empty to arm without one.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "The mode to arm in, such as away or night. Custom modes work too."
+        }
+      }
+    },
+    "disarm": {
+      "name": "Disarm",
+      "description": "Disarms an alarm."
+    },
+    "trigger": {
+      "name": "Trigger",
+      "description": "Triggers an alarm, which starts its escalation policy.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "The mode to trigger in. Leave empty to use the alarm's current one."
+        }
+      }
+    },
+    "clear": {
+      "name": "Clear",
+      "description": "Clears an alarm's open incident."
+    },
+    "panic": {
+      "name": "Panic",
+      "description": "Triggers a panic button."
+    },
+    "panic_clear": {
+      "name": "Clear panic",
+      "description": "Clears a panic button's open incident."
+    }
+  }
+}
