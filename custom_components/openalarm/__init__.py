@@ -126,6 +126,7 @@ def _async_sync_devices(
         name=f"{MANUFACTURER} {location_name}",
         manufacturer=MANUFACTURER,
         model="Location",
+        entry_type=dr.DeviceEntryType.SERVICE,
         configuration_url=APP_URL,
     )
 
@@ -146,6 +147,7 @@ def _async_sync_devices(
                 name=item.get("name") or trigger_id,
                 manufacturer=MANUFACTURER,
                 model=model,
+                entry_type=dr.DeviceEntryType.SERVICE,
                 via_device=(DOMAIN, f"location:{location_id}"),
                 suggested_area=location_name,
                 configuration_url=APP_URL,
