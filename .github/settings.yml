@@ -1,0 +1,18 @@
+repository:
+  name: reference
+  description: OpenAlarm - HomeAssistant
+  homepage: https://openalarm.io/
+  private: true
+  has_issues: true
+  has_wiki: false
+  has_projects: false
+  allow_squash_merge: true
+  allow_merge_commit: true
+  allow_rebase_merge: true
+  delete_branch_on_merge: true
+
+labels:
+  - name: bug
+    color: "CC0000"
+  - name: feature
+    color: "336699"
