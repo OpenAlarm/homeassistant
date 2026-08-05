@@ -1,10 +1,13 @@
 arm:
-  target:
-    device:
-      filter:
-        - integration: openalarm
-          model: Alarm
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: openalarm
+              model: Alarm
     mode:
       required: false
       example: away
@@ -12,19 +15,26 @@ arm:
         text:
 
 disarm:
-  target:
-    device:
-      filter:
-        - integration: openalarm
-          model: Alarm
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: openalarm
+              model: Alarm
 
 trigger:
-  target:
-    device:
-      filter:
-        - integration: openalarm
-          model: Alarm
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: openalarm
+              model: Alarm
     mode:
       required: false
       example: away
@@ -32,22 +42,34 @@ trigger:
         text:
 
 clear:
-  target:
-    device:
-      filter:
-        - integration: openalarm
-          model: Alarm
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: openalarm
+              model: Alarm
 
 panic:
-  target:
-    device:
-      filter:
-        - integration: openalarm
-          model: Panic Button
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: openalarm
+              model: Panic Button
 
 panic_clear:
-  target:
-    device:
-      filter:
-        - integration: openalarm
-          model: Panic Button
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: openalarm
+              model: Panic Button

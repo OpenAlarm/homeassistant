@@ -47,6 +47,10 @@
       "name": "Arm",
       "description": "Arms an alarm. Leave the mode empty to arm without one.",
       "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The OpenAlarm device to act on."
+        },
         "mode": {
           "name": "Mode",
           "description": "The mode to arm in, such as away or night. Custom modes work too."
@@ -55,12 +59,22 @@
     },
     "disarm": {
       "name": "Disarm",
-      "description": "Disarms an alarm."
+      "description": "Disarms an alarm.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The OpenAlarm device to act on."
+        }
+      }
     },
     "trigger": {
       "name": "Trigger",
       "description": "Triggers an alarm, which starts its escalation policy.",
       "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The OpenAlarm device to act on."
+        },
         "mode": {
           "name": "Mode",
           "description": "The mode to trigger in. Leave empty to use the alarm's current one."
@@ -69,15 +83,33 @@
     },
     "clear": {
       "name": "Clear",
-      "description": "Clears an alarm's open incident."
+      "description": "Clears an alarm's open incident.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The OpenAlarm device to act on."
+        }
+      }
     },
     "panic": {
       "name": "Panic",
-      "description": "Triggers a panic button."
+      "description": "Triggers a panic button.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The OpenAlarm device to act on."
+        }
+      }
     },
     "panic_clear": {
       "name": "Clear panic",
-      "description": "Clears a panic button's open incident."
+      "description": "Clears a panic button's open incident.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The OpenAlarm device to act on."
+        }
+      }
     }
   }
 }

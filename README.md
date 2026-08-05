@@ -63,7 +63,7 @@ automation:
         to: "triggered"
     actions:
       - action: openalarm.trigger
-        target:
+        data:
           device_id: !input openalarm_device
 
   - alias: "Keep OpenAlarm in step when arming"
@@ -73,9 +73,8 @@ automation:
         to: "armed_away"
     actions:
       - action: openalarm.arm
-        target:
-          device_id: !input openalarm_device
         data:
+          device_id: !input openalarm_device
           mode: away
 ```
 
