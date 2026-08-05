@@ -40,7 +40,7 @@ from .coordinator import OpenAlarmCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [Platform.ALARM_CONTROL_PANEL]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 

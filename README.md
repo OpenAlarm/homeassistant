@@ -23,6 +23,8 @@ Six actions:
 
 Your modes come from your account, including custom ones. Add a mode in the OpenAlarm console and it appears here after the next refresh, with no reinstall.
 
+Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is what Home Assistant last sent through it: OpenAlarm does not report state back, so arming from the console or another client will not move the entity. It is marked assumed-state, which is why the UI shows explicit buttons rather than a state it cannot actually know. Custom modes are armed through `openalarm.alarm_arm`; the panel covers Home, Away and Night.
+
 ## Requirements
 
 - Home Assistant 2025.3 or newer
