@@ -1,8 +1,9 @@
 arm:
   target:
     device:
-      integration: openalarm
-      model: Alarm
+      filter:
+        - integration: openalarm
+          model: Alarm
   fields:
     mode:
       required: false
@@ -13,14 +14,16 @@ arm:
 disarm:
   target:
     device:
-      integration: openalarm
-      model: Alarm
+      filter:
+        - integration: openalarm
+          model: Alarm
 
 trigger:
   target:
     device:
-      integration: openalarm
-      model: Alarm
+      filter:
+        - integration: openalarm
+          model: Alarm
   fields:
     mode:
       required: false
@@ -31,17 +34,20 @@ trigger:
 clear:
   target:
     device:
-      integration: openalarm
-      model: Alarm
+      filter:
+        - integration: openalarm
+          model: Alarm
 
 panic:
   target:
     device:
-      integration: openalarm
-      model: Panic Button
+      filter:
+        - integration: openalarm
+          model: Panic Button
 
 panic_clear:
   target:
     device:
-      integration: openalarm
-      model: Panic Button
+      filter:
+        - integration: openalarm
+          model: Panic Button
