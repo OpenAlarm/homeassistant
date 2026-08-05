@@ -19,7 +19,6 @@ from homeassistant.helpers.selector import (
 from .api import InvalidAuth, OpenAlarmClient, OpenAlarmError
 from .const import (
     CONF_API_KEY,
-    CONF_BASE_URL,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
     DEFAULT_BASE_URL,
@@ -49,9 +48,8 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             api_key = user_input[CONF_API_KEY].strip()
-            base_url = user_input.get(CONF_BASE_URL, DEFAULT_BASE_URL).strip()
             try:
-                locations = await self._describe(api_key, base_url)
+                locations = await self._describe(api_key, self._base_url)
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except OpenAlarmError:
@@ -61,18 +59,12 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors["base"] = "no_locations"
                 else:
                     self._api_key = api_key
-                    self._base_url = base_url
                     self._locations = locations
                     return await self.async_step_location()
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_API_KEY): str,
-                    vol.Optional(CONF_BASE_URL, default=DEFAULT_BASE_URL): str,
-                }
-            ),
+            data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
             errors=errors,
         )
 
@@ -96,7 +88,6 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
                 title=name,
                 data={
                     CONF_API_KEY: self._api_key,
-                    CONF_BASE_URL: self._base_url,
                     CONF_LOCATION_ID: location_id,
                     CONF_LOCATION_NAME: name,
                 },
@@ -137,7 +128,7 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             api_key = user_input[CONF_API_KEY].strip()
-            base_url = entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL)
+            base_url = DEFAULT_BASE_URL
             try:
                 locations = await self._describe(api_key, base_url)
             except InvalidAuth:

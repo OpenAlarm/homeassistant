@@ -5,11 +5,7 @@
         "title": "Connect OpenAlarm",
         "description": "Create an API key in the OpenAlarm console under API Keys, then paste it here. The key decides which alarms and panic buttons Home Assistant can reach.",
         "data": {
-          "api_key": "API key",
-          "base_url": "API address"
-        },
-        "data_description": {
-          "base_url": "Leave this alone unless you were told otherwise."
+          "api_key": "API key"
         }
       },
       "location": {
