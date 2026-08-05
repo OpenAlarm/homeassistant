@@ -76,6 +76,11 @@ class OpenAlarmClient:
         body = await self._get("/v1/integration/describe")
         return body.get("data") or {}
 
+    async def state(self) -> dict[str, Any]:
+        """Return the live state of every alarm this key can reach."""
+        body = await self._get("/v1/integration/state")
+        return body.get("data") or {}
+
     async def act(
         self, kind: str, trigger_id: str, action: str, mode: str | None = None
     ) -> dict[str, Any]:

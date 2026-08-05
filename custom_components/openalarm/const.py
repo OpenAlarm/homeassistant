@@ -26,4 +26,5 @@ KIND_ALARM = "alarm"
 KIND_PANIC = "panic"
 
 UPDATE_INTERVAL = timedelta(hours=6)
+STATE_UPDATE_INTERVAL = timedelta(seconds=60)
 REQUEST_TIMEOUT = 15

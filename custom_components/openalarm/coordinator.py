@@ -11,7 +11,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import InvalidAuth, OpenAlarmClient, OpenAlarmError
-from .const import DOMAIN, UPDATE_INTERVAL
+from .const import DOMAIN, STATE_UPDATE_INTERVAL, UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,3 +73,32 @@ class OpenAlarmCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if alarm.get("id") == alarm_id:
                 return list(alarm.get("modes") or [])
         return []
+
+
+class OpenAlarmStateCoordinator(DataUpdateCoordinator[dict[str, str]]):
+    """Polls alarm state at a cadence a panel can honestly show."""
+
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, client: OpenAlarmClient
+    ) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN} state",
+            update_interval=STATE_UPDATE_INTERVAL,
+            config_entry=entry,
+        )
+        self.client = client
+
+    async def _async_update_data(self) -> dict[str, str]:
+        try:
+            data = await self.client.state()
+        except InvalidAuth as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except OpenAlarmError as err:
+            raise UpdateFailed(str(err)) from err
+        return {
+            alarm["id"]: str(alarm.get("state") or "disarmed")
+            for alarm in data.get("alarms") or []
+            if alarm.get("id")
+        }

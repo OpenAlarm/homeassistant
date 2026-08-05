@@ -36,7 +36,7 @@ from .const import (
     SERVICE_PANIC_CLEAR,
     SERVICE_TRIGGER,
 )
-from .coordinator import OpenAlarmCoordinator
+from .coordinator import OpenAlarmCoordinator, OpenAlarmStateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +44,16 @@ PLATFORMS: list[Platform] = [Platform.ALARM_CONTROL_PANEL]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-type OpenAlarmConfigEntry = ConfigEntry[OpenAlarmCoordinator]
+@dataclass
+class OpenAlarmData:
+    """Everything one location's entry holds at runtime."""
+
+    client: OpenAlarmClient
+    inventory: OpenAlarmCoordinator
+    state: OpenAlarmStateCoordinator
+
+
+type OpenAlarmConfigEntry = ConfigEntry[OpenAlarmData]
 
 TARGET_SCHEMA = vol.Schema(
     {vol.Required("device_id"): vol.All(cv.ensure_list, [cv.string])},
@@ -83,16 +92,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) ->
         entry.data[CONF_API_KEY],
         entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
     )
-    coordinator = OpenAlarmCoordinator(
+    inventory = OpenAlarmCoordinator(
         hass, entry, client, entry.data[CONF_LOCATION_ID]
     )
-    await coordinator.async_config_entry_first_refresh()
+    await inventory.async_config_entry_first_refresh()
+    state = OpenAlarmStateCoordinator(hass, entry, client)
+    await state.async_config_entry_first_refresh()
 
-    entry.runtime_data = coordinator
-    _async_sync_devices(hass, entry, coordinator)
+    entry.runtime_data = OpenAlarmData(client=client, inventory=inventory, state=state)
+    _async_sync_devices(hass, entry, inventory)
     entry.async_on_unload(
-        coordinator.async_add_listener(
-            lambda: _async_sync_devices(hass, entry, coordinator)
+        inventory.async_add_listener(
+            lambda: _async_sync_devices(hass, entry, inventory)
         )
     )
 
@@ -176,14 +187,16 @@ def _resolve(hass: HomeAssistant, call: ServiceCall, kind: str) -> list[Target]:
             wanted = "an alarm" if kind == KIND_ALARM else "a panic button"
             raise ServiceValidationError(f"{device.name or device_id} is not {wanted}")
 
-        coordinator = _coordinator_for(hass, device)
-        if coordinator is None:
+        data = _data_for(hass, device)
+        if data is None:
             raise ServiceValidationError(
                 f"The OpenAlarm location holding {device.name or trigger_id} "
                 "is not loaded"
             )
 
-        targets.append(Target(coordinator, kind, trigger_id, device.name or trigger_id))
+        targets.append(
+            Target(data.inventory, kind, trigger_id, device.name or trigger_id)
+        )
 
     if not targets:
         raise ServiceValidationError("No OpenAlarm device was targeted")
@@ -191,9 +204,7 @@ def _resolve(hass: HomeAssistant, call: ServiceCall, kind: str) -> list[Target]:
     return targets
 
 
-def _coordinator_for(
-    hass: HomeAssistant, device: dr.DeviceEntry
-) -> OpenAlarmCoordinator | None:
+def _data_for(hass: HomeAssistant, device: dr.DeviceEntry) -> OpenAlarmData | None:
     for entry_id in device.config_entries:
         entry = hass.config_entries.async_get_entry(entry_id)
         if entry is None or entry.domain != DOMAIN:
