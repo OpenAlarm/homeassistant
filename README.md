@@ -23,7 +23,7 @@ Six actions:
 
 Your modes come from your account, including custom ones. Add a mode in the OpenAlarm console and it appears here after the next refresh, with no reinstall.
 
-Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is the service's real state, polled every minute: arm from the OpenAlarm console and the entity follows within that minute, and an open incident shows as triggered until it clears. Commands reflect immediately. Custom modes are armed through `openalarm.alarm_arm` and show on the panel as armed custom; the panel's own buttons cover Home, Away and Night.
+Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is the service's real state, polled every minute: arm it from anywhere else - a script, another integration, a curl - and the entity follows within that minute, and an open incident shows as triggered until it clears. (The console never arms anything, by design: it reads state, and arming arrives only through the API.) Commands reflect immediately. Custom modes are armed through `openalarm.alarm_arm` and show on the panel as armed custom; the panel's own buttons cover Home, Away and Night.
 
 ## Requirements
 

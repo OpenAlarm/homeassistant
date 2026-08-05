@@ -69,7 +69,7 @@ class OpenAlarmPanel(
     """One alarm, drivable from dashboards, showing the service's real state.
 
     State comes from the integration's state surface on a one-minute poll, so
-    arming from the OpenAlarm console shows up here within that minute, and an
+    an arm sent by any other client shows up here within that minute, and an
     open incident reads as triggered until it clears. A command sets the state
     optimistically for instant feedback, then the next poll confirms it from
     the server.
