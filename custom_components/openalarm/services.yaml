@@ -12,7 +12,14 @@ arm:
       required: false
       example: away
       selector:
-        text:
+        select:
+          mode: dropdown
+          custom_value: true
+          translation_key: mode
+          options:
+            - home
+            - away
+            - night
 
 disarm:
   fields:
@@ -39,7 +46,14 @@ trigger:
       required: false
       example: away
       selector:
-        text:
+        select:
+          mode: dropdown
+          custom_value: true
+          translation_key: mode
+          options:
+            - home
+            - away
+            - night
 
 clear:
   fields:

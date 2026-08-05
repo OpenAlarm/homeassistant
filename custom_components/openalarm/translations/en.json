@@ -49,7 +49,7 @@
         },
         "mode": {
           "name": "Mode",
-          "description": "The mode to arm in, such as away or night. Custom modes work too."
+          "description": "Pick one of your alarm's modes, or type the ID of a custom mode."
         }
       }
     },
@@ -73,7 +73,7 @@
         },
         "mode": {
           "name": "Mode",
-          "description": "The mode to trigger in. Leave empty to use the alarm's current one."
+          "description": "The mode to trigger in. Pick one, type a custom mode ID, or leave empty to use the alarm's current mode."
         }
       }
     },
@@ -105,6 +105,15 @@
           "name": "Device",
           "description": "The OpenAlarm device to act on."
         }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "home": "Home",
+        "away": "Away",
+        "night": "Night"
       }
     }
   }
