@@ -2,7 +2,7 @@ repository:
   name: homeassistant
   description: Arm, disarm and trigger your OpenAlarm alarms and panic buttons from Home Assistant automations.
   homepage: https://openalarm.io/
-  private: true
+  private: false
   has_issues: true
   has_wiki: false
   has_projects: false

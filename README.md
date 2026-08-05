@@ -25,7 +25,7 @@ Your modes come from your account, including custom ones. Add a mode in the Open
 
 ## Requirements
 
-- Home Assistant 2024.12 or newer
+- Home Assistant 2025.3 or newer
 - An OpenAlarm account and an API key
 
 ## Installation
