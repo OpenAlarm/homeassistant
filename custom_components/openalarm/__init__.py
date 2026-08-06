@@ -139,10 +139,14 @@ async def _async_refresh_mode_options(hass: HomeAssistant) -> None:
     as everything else - the six-hour poll, an entry reload, or setup.
     """
     labels: dict[str, dict[str, set[str]]] = {}
+    ready = (ConfigEntryState.LOADED, ConfigEntryState.SETUP_IN_PROGRESS)
     for entry in hass.config_entries.async_entries(DOMAIN):
-        if entry.state is not ConfigEntryState.LOADED:
+        if entry.state not in ready:
             continue
-        for alarm in entry.runtime_data.inventory.alarms():
+        data = getattr(entry, "runtime_data", None)
+        if data is None:
+            continue
+        for alarm in data.inventory.alarms():
             for mode in alarm.get("modes") or []:
                 mode_id = mode.get("id")
                 if not mode_id:

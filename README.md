@@ -105,6 +105,15 @@ logger:
 
 **An action fails with "OpenAlarm no longer has ..."** - that trigger was deleted, disabled, or dropped from the key's scope.
 
+## Development
+
+```bash
+python3 -m venv venv && venv/bin/pip install -r requirements_test.txt
+venv/bin/pytest tests -q
+```
+
+CI runs the same tests plus HACS validation and hassfest on every push.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
