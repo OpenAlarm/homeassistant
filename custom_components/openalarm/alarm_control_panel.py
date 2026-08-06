@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from homeassistant.components.alarm_control_panel import (
@@ -22,6 +23,8 @@ from .const import DOMAIN, KIND_ALARM
 from .coordinator import OpenAlarmStateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+PENDING_WINDOW = 30.0
 
 MODE_FEATURES = {
     "home": AlarmControlPanelEntityFeature.ARM_HOME,
@@ -71,8 +74,9 @@ class OpenAlarmPanel(
     State comes from the integration's state surface on a one-minute poll, so
     an arm sent by any other client shows up here within that minute, and an
     open incident reads as triggered until it clears. A command sets the state
-    optimistically for instant feedback, then the next poll confirms it from
-    the server.
+    optimistically for instant feedback and holds it until the server confirms
+    it or the pending window lapses - the arm endpoint is eventually
+    consistent, so a poll racing the queue must not snap the panel back.
     """
 
     _attr_has_entity_name = True
@@ -84,6 +88,7 @@ class OpenAlarmPanel(
         self._data = data
         self.alarm_id = alarm_id
         self._pending: AlarmControlPanelState | None = None
+        self._pending_until: float = 0.0
         self._attr_unique_id = f"{KIND_ALARM}:{alarm_id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{KIND_ALARM}:{alarm_id}")}
@@ -98,8 +103,14 @@ class OpenAlarmPanel(
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        self._pending = None
+        if self._pending is not None:
+            confirmed = self._server_state() == self._pending
+            if confirmed or time.monotonic() >= self._pending_until:
+                self._pending = None
         super()._handle_coordinator_update()
+
+    def _server_state(self) -> AlarmControlPanelState | None:
+        return SERVER_TO_HA.get((self.coordinator.data or {}).get(self.alarm_id))
 
     @property
     def available(self) -> bool:
@@ -111,9 +122,9 @@ class OpenAlarmPanel(
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
-        if self._pending is not None:
+        if self._pending is not None and time.monotonic() < self._pending_until:
             return self._pending
-        return SERVER_TO_HA.get((self.coordinator.data or {}).get(self.alarm_id))
+        return self._server_state()
 
     @property
     def supported_features(self) -> AlarmControlPanelEntityFeature:
@@ -147,6 +158,7 @@ class OpenAlarmPanel(
             (body.get("data") or {}).get("environment"),
         )
         self._pending = state
+        self._pending_until = time.monotonic() + PENDING_WINDOW
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
