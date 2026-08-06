@@ -5,7 +5,7 @@ from datetime import timedelta
 DOMAIN = "openalarm"
 
 DEFAULT_BASE_URL = "https://api.openalarm.io"
-APP_URL = "https://app.openalarm.io/"
+APP_URL = "https://console.openalarm.io/"
 MANUFACTURER = "OpenAlarm"
 
 CONF_API_KEY = "api_key"
