@@ -42,6 +42,7 @@ from .const import (
     SERVICE_TRIGGER,
 )
 from .coordinator import OpenAlarmCoordinator, OpenAlarmStateCoordinator
+from .realtime import OpenAlarmRealtime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class OpenAlarmData:
     client: OpenAlarmClient
     inventory: OpenAlarmCoordinator
     state: OpenAlarmStateCoordinator
+    realtime: OpenAlarmRealtime | None = None
 
 
 type OpenAlarmConfigEntry = ConfigEntry[OpenAlarmData]
@@ -90,6 +92,27 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+def _async_start_realtime(hass: HomeAssistant, entry: OpenAlarmConfigEntry) -> None:
+    """Open the push channel once the describe payload advertises one."""
+    data = entry.runtime_data
+    recipe = data.inventory.realtime
+    if data.realtime is not None or not recipe:
+        return
+    try:
+        listener = OpenAlarmRealtime(
+            async_get_clientsession(hass),
+            entry.data[CONF_API_KEY],
+            recipe,
+            data.state.async_request_refresh,
+        )
+    except KeyError:
+        _LOGGER.warning("realtime recipe is incomplete; staying on polling")
+        return
+    data.realtime = listener
+    listener.start()
+    entry.async_on_unload(listener.stop)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) -> bool:
     """Set up one location from a config entry."""
     client = OpenAlarmClient(
@@ -105,6 +128,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) ->
     await state.async_config_entry_first_refresh()
 
     entry.runtime_data = OpenAlarmData(client=client, inventory=inventory, state=state)
+    _async_start_realtime(hass, entry)
+    entry.async_on_unload(
+        inventory.async_add_listener(lambda: _async_start_realtime(hass, entry))
+    )
     _async_sync_devices(hass, entry, inventory)
     entry.async_on_unload(
         inventory.async_add_listener(

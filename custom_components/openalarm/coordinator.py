@@ -35,6 +35,7 @@ class OpenAlarmCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.client = client
         self.location_id = location_id
+        self.realtime: dict[str, Any] | None = None
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -43,6 +44,8 @@ class OpenAlarmCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except OpenAlarmError as err:
             raise UpdateFailed(str(err)) from err
+
+        self.realtime = data.get("realtime") if isinstance(data.get("realtime"), dict) else None
 
         for location in data.get("locations") or []:
             if location.get("id") == self.location_id:
