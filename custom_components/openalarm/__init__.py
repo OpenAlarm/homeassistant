@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,6 +15,10 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service import (
+    async_get_all_descriptions,
+    async_set_service_schema,
+)
 from homeassistant.helpers.typing import ConfigType
 
 from .api import NotFound, OpenAlarmClient, OpenAlarmError
@@ -106,14 +111,80 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) ->
             lambda: _async_sync_devices(hass, entry, inventory)
         )
     )
+    entry.async_on_unload(
+        inventory.async_add_listener(
+            lambda: hass.async_create_task(_async_refresh_mode_options(hass))
+        )
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _async_refresh_mode_options(hass)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        hass.async_create_task(_async_refresh_mode_options(hass))
+    return unloaded
+
+
+async def _async_refresh_mode_options(hass: HomeAssistant) -> None:
+    """Rebuild the arm and trigger mode dropdowns from live inventory.
+
+    Modes are shown by their configured name and submitted by id, merged
+    across every loaded location. Runs after each inventory refresh, so a
+    mode added or renamed in the console appears here on the same cadence
+    as everything else - the six-hour poll, an entry reload, or setup.
+    """
+    labels: dict[str, dict[str, set[str]]] = {}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.state is not ConfigEntryState.LOADED:
+            continue
+        for alarm in entry.runtime_data.inventory.alarms():
+            for mode in alarm.get("modes") or []:
+                mode_id = mode.get("id")
+                if not mode_id:
+                    continue
+                record = labels.setdefault(mode_id, {"names": set(), "alarms": set()})
+                record["names"].add(mode.get("name") or mode_id)
+                record["alarms"].add(alarm.get("name") or "")
+
+    seeded = ("home", "away", "night")
+    options = [
+        {
+            "value": mode_id,
+            "label": " / ".join(sorted(record["names"])),
+        }
+        for mode_id, record in labels.items()
+    ]
+    options.sort(
+        key=lambda option: (
+            option["value"] not in seeded,
+            seeded.index(option["value"]) if option["value"] in seeded else 0,
+            option["label"].lower(),
+        )
+    )
+    if not options:
+        return
+
+    descriptions = (await async_get_all_descriptions(hass)).get(DOMAIN) or {}
+    for service in (SERVICE_ARM, SERVICE_TRIGGER):
+        current = descriptions.get(service)
+        if not current:
+            continue
+        patched = deepcopy(current)
+        select = (
+            patched.get("fields", {})
+            .get(ATTR_MODE, {})
+            .get("selector", {})
+            .get("select")
+        )
+        if select is None:
+            continue
+        select["options"] = options
+        async_set_service_schema(hass, DOMAIN, service, patched)
 
 
 def _async_sync_devices(

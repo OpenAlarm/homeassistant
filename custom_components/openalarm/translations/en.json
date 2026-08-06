@@ -42,7 +42,7 @@
         },
         "mode": {
           "name": "Mode",
-          "description": "Pick one of your alarm's modes, or type the ID of a custom mode."
+          "description": "Pick a mode. Custom modes appear here by name once the integration has loaded them; typing an id also works."
         }
       }
     },
@@ -66,7 +66,7 @@
         },
         "mode": {
           "name": "Mode",
-          "description": "The mode to trigger in. Pick one, type a custom mode ID, or leave empty to use the alarm's current mode."
+          "description": "The mode to trigger in. Custom modes appear by name; leave empty to use the alarm's current mode."
         }
       }
     },
