@@ -28,7 +28,6 @@ from .const import (
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_LOCATION_ID,
-    CONF_LOCATION_NAME,
     DEFAULT_BASE_URL,
     DOMAIN,
     KIND_ALARM,
@@ -228,11 +227,6 @@ def _async_sync_devices(
     offering controls that would 404.
     """
     registry = dr.async_get(hass)
-    location_name = (
-        coordinator.location_name
-        or entry.data.get(CONF_LOCATION_NAME)
-        or entry.data[CONF_LOCATION_ID]
-    )
 
     live: set[str] = set()
     for kind, model, items in (
@@ -252,7 +246,6 @@ def _async_sync_devices(
                 manufacturer=MANUFACTURER,
                 model=model,
                 entry_type=dr.DeviceEntryType.SERVICE,
-                suggested_area=location_name,
                 configuration_url=APP_URL,
             )
 
