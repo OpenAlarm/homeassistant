@@ -1,0 +1,59 @@
+blueprint:
+  name: Forward an alarm panel to OpenAlarm
+  description: >-
+    Keeps an OpenAlarm alarm in step with any Home Assistant alarm panel,
+    Alarmo included. Arming states mirror across, a trigger opens an
+    OpenAlarm incident so your contacts are alerted, and a disarm ends it.
+  domain: automation
+  source_url: https://github.com/OpenAlarm/homeassistant/blob/main/blueprints/automation/openalarm/forward_alarm_panel.yaml
+  input:
+    panel:
+      name: Alarm panel
+      description: The Home Assistant alarm panel to mirror.
+      selector:
+        entity:
+          filter:
+            - domain: alarm_control_panel
+    openalarm_device:
+      name: OpenAlarm alarm
+      description: The OpenAlarm alarm that alerts your contacts.
+      selector:
+        device:
+          filter:
+            - integration: openalarm
+              model: Alarm
+
+mode: queued
+max: 10
+
+triggers:
+  - trigger: state
+    entity_id: !input panel
+    to:
+      - triggered
+      - armed_home
+      - armed_away
+      - armed_night
+      - disarmed
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'triggered' }}"
+        sequence:
+          - action: openalarm.alarm_trigger
+            data:
+              device_id: !input openalarm_device
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'disarmed' }}"
+        sequence:
+          - action: openalarm.alarm_disarm
+            data:
+              device_id: !input openalarm_device
+    default:
+      - action: openalarm.alarm_arm
+        data:
+          device_id: !input openalarm_device
+          mode: "{{ trigger.to_state.state | replace('armed_', '') }}"

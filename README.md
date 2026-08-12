@@ -54,33 +54,16 @@ The key decides what Home Assistant can see. A key scoped to one alarm exposes o
 
 If the key reaches more than one location, you will be asked which one to set up. Locations are configured separately, so add the integration again for each.
 
-## Using it with Alarmo
+## Using it with Alarmo (or any alarm panel)
 
-[Alarmo](https://github.com/nielsfaber/alarmo) is the panel. OpenAlarm is the alerting layer. They fit together rather than competing:
+[Alarmo](https://github.com/nielsfaber/alarmo) is the panel. OpenAlarm is the alerting layer. They fit together rather than competing, and the blueprint wires them in one step:
 
-```yaml
-automation:
-  - alias: "Tell OpenAlarm the alarm was triggered"
-    triggers:
-      - trigger: state
-        entity_id: alarm_control_panel.alarmo
-        to: "triggered"
-    actions:
-      - action: openalarm.alarm_trigger
-        data:
-          device_id: !input openalarm_device
+[![Import blueprint into Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FOpenAlarm%2Fhomeassistant%2Fmain%2Fblueprints%2Fautomation%2Fopenalarm%2Fforward_alarm_panel.yaml)
 
-  - alias: "Keep OpenAlarm in step when arming"
-    triggers:
-      - trigger: state
-        entity_id: alarm_control_panel.alarmo
-        to: "armed_away"
-    actions:
-      - action: openalarm.alarm_arm
-        data:
-          device_id: !input openalarm_device
-          mode: away
-```
+Pick your panel entity and your OpenAlarm alarm, and the automation keeps them in step: arming states mirror across, a trigger opens an OpenAlarm incident so your contacts are alerted, and a disarm ends it. It works with any `alarm_control_panel` entity - Alarmo, a Ring keypad, the manual panel, anything.
+
+Prefer to write it yourself? The blueprint is plain YAML at
+[`blueprints/automation/openalarm/forward_alarm_panel.yaml`](blueprints/automation/openalarm/forward_alarm_panel.yaml) - the same service calls work in any automation.
 
 ## Refreshing
 
