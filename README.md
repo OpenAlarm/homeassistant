@@ -8,7 +8,7 @@ It is a messenger, not a monitoring service. Nothing here contacts emergency ser
 
 ## What you get
 
-Every alarm and panic button your API key can reach becomes a device, placed in an area named after its OpenAlarm location. Automations target those devices by name, so you write `Cabin Perimeter`, never a 32-character ID. Nothing else is created: no hub device, no extra entities.
+Every alarm and panic button your API key can reach becomes a device. Automations target those devices by name, so you write `Cabin Perimeter`, never a 32-character ID. Nothing else is created: no hub device, no extra entities.
 
 State stays in step in both directions. The integration holds a push connection to OpenAlarm, so an arm, disarm or trigger made anywhere - the console, another integration, a curl - shows up on the panel within a couple of seconds. If the connection drops, the integration falls back to its one-minute poll until it reconnects.
 
