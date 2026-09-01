@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState, ConfigSubentry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -40,7 +39,6 @@ from .const import (
     SERVICE_PANIC,
     SERVICE_PANIC_CLEAR,
     SERVICE_TRIGGER,
-    SUBENTRY_ALARM,
 )
 from .coordinator import OpenAlarmCoordinator, OpenAlarmStateCoordinator
 from .readiness import async_check_ready
@@ -135,15 +133,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) ->
     entry.async_on_unload(
         inventory.async_add_listener(lambda: _async_start_realtime(hass, entry))
     )
-    _async_sync_subentries(hass, entry, inventory)
     _async_sync_devices(hass, entry, inventory)
-
-    @callback
-    def _resync() -> None:
-        _async_sync_subentries(hass, entry, inventory)
-        _async_sync_devices(hass, entry, inventory)
-
-    entry.async_on_unload(inventory.async_add_listener(_resync))
+    entry.async_on_unload(
+        inventory.async_add_listener(
+            lambda: _async_sync_devices(hass, entry, inventory)
+        )
+    )
     entry.async_on_unload(
         inventory.async_add_listener(
             lambda: hass.async_create_task(_async_refresh_mode_options(hass))
@@ -224,54 +219,11 @@ async def _async_refresh_mode_options(hass: HomeAssistant) -> None:
         async_set_service_schema(hass, DOMAIN, service, patched)
 
 
-@callback
-def subentry_for(entry: ConfigEntry, alarm_id: str) -> ConfigSubentry | None:
-    """The subentry holding one alarm's own settings, if it exists yet."""
-    for subentry in entry.subentries.values():
-        if subentry.subentry_type == SUBENTRY_ALARM and subentry.unique_id == alarm_id:
-            return subentry
-    return None
-
-
-@callback
-def _async_sync_subentries(
-    hass: HomeAssistant, entry: OpenAlarmConfigEntry, coordinator: OpenAlarmCoordinator
-) -> None:
-    """Give every alarm a subentry, so each carries its own settings.
-
-    Alarms come from the console, not from a flow, so subentries are created
-    here as the inventory reveals them and follow the alarm's name. One that
-    leaves the inventory keeps its subentry and settings, in case the alarm
-    comes back into the key's scope; the user can delete it from the UI.
-    Panic buttons never arm, so they get none.
-    """
-    for alarm in coordinator.alarms():
-        alarm_id = alarm.get("id")
-        if not alarm_id:
-            continue
-        title = alarm.get("name") or alarm_id
-        subentry = subentry_for(entry, alarm_id)
-        if subentry is None:
-            hass.config_entries.async_add_subentry(
-                entry,
-                ConfigSubentry(
-                    data=MappingProxyType({}),
-                    subentry_type=SUBENTRY_ALARM,
-                    title=title,
-                    unique_id=alarm_id,
-                ),
-            )
-        elif subentry.title != title:
-            hass.config_entries.async_update_subentry(entry, subentry, title=title)
-
-
 def _async_sync_devices(
     hass: HomeAssistant, entry: OpenAlarmConfigEntry, coordinator: OpenAlarmCoordinator
 ) -> None:
     """Mirror the inventory into the device registry.
 
-    An alarm's device lives under the alarm's subentry; a device registered
-    before subentries existed is moved there explicitly, which keeps its id.
     A trigger that leaves the inventory has been deleted, disabled, or dropped
     from the key's scope. Its device is detached rather than left behind
     offering controls that would 404.
@@ -289,19 +241,8 @@ def _async_sync_devices(
                 continue
             unique_id = f"{kind}:{trigger_id}"
             live.add(unique_id)
-            subentry_id = None
-            if kind == KIND_ALARM and (subentry := subentry_for(entry, trigger_id)):
-                subentry_id = subentry.subentry_id
-            existing = registry.async_get_device_by_identifier(
-                (DOMAIN, unique_id), entry.entry_id
-            )
-            if existing is not None and existing.config_subentry_id != subentry_id:
-                registry.async_update_device(
-                    existing.id, new_config_subentry_id=subentry_id
-                )
             registry.async_get_or_create(
                 config_entry_id=entry.entry_id,
-                config_subentry_id=subentry_id,
                 identifiers={(DOMAIN, unique_id)},
                 name=item.get("name") or trigger_id,
                 manufacturer=MANUFACTURER,
@@ -386,7 +327,11 @@ async def _run(
 
         if kind == KIND_ALARM and action == "arm":
             async_check_ready(
-                hass, target.coordinator.config_entry, target.device, target.name
+                hass,
+                target.coordinator.config_entry,
+                target.device,
+                target.trigger_id,
+                target.name,
             )
 
         try:

@@ -12,9 +12,9 @@ CONF_API_KEY = "api_key"
 CONF_BASE_URL = "base_url"
 CONF_LOCATION_ID = "location_id"
 CONF_LOCATION_NAME = "location_name"
+CONF_READINESS = "readiness"
+CONF_ALARM = "alarm"
 CONF_SENSORS = "sensors"
-
-SUBENTRY_ALARM = "alarm"
 
 ATTR_MODE = "mode"
 

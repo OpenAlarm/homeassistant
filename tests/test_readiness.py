@@ -16,10 +16,10 @@ from custom_components.openalarm.const import (
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
+    CONF_READINESS,
     CONF_SENSORS,
     DEFAULT_BASE_URL,
     DOMAIN,
-    SUBENTRY_ALARM,
 )
 
 DESCRIBE = f"{DEFAULT_BASE_URL}/v1/integration/describe"
@@ -97,16 +97,9 @@ def place_alarm(hass, entry, area_id=None, labels=None):
     )
 
 
-def alarm_subentry(entry):
-    return next(
-        s for s in entry.subentries.values()
-        if s.subentry_type == SUBENTRY_ALARM and s.unique_id == "a1"
-    )
-
-
 def pick_sensors(hass, entry, sensors):
-    hass.config_entries.async_update_subentry(
-        entry, alarm_subentry(entry), data={CONF_SENSORS: sensors}
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_READINESS: {"a1": sensors}}
     )
 
 
@@ -266,42 +259,6 @@ async def test_disarm_is_never_gated(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "disarmed"
 
 
-async def test_each_alarm_gets_a_subentry_and_its_device_lives_there(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-    subentry = alarm_subentry(entry)
-    assert subentry.title == "Front"
-
-    device = alarm_device(hass, entry)
-    assert device.config_subentry_id == subentry.subentry_id
-
-    panel = er.async_get(hass).async_get(ENTITY)
-    assert panel.config_subentry_id == subentry.subentry_id
-
-
-async def test_a_device_from_before_subentries_is_moved_keeping_its_id(hass, aioclient_mock):
-    registry = dr.async_get(hass)
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id="loc-home",
-        title="Home",
-        data={CONF_API_KEY: "oa_x", CONF_LOCATION_ID: "loc-home", CONF_LOCATION_NAME: "Home"},
-    )
-    entry.add_to_hass(hass)
-    old = registry.async_get_or_create(
-        config_entry_id=entry.entry_id, identifiers={(DOMAIN, "alarm:a1")}, name="Front"
-    )
-    assert old.config_subentry_id is None
-
-    aioclient_mock.get(DESCRIBE, json=BODY)
-    aioclient_mock.get(STATE, json=STATE_BODY)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    moved = registry.async_get(old.id)
-    assert moved.config_subentry_id == alarm_subentry(entry).subentry_id
-    assert alarm_device(hass, entry).id == old.id
-
-
 async def test_picked_sensors_gate_arming(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
     sensor(hass, "front_door", "Front Door", "on", "door")
@@ -342,29 +299,64 @@ async def test_picked_sensors_and_area_combine(hass, aioclient_mock):
     assert "Garage Door is not clear" in str(raised.value)
 
 
-async def test_the_reconfigure_flow_stores_the_picks(hass, aioclient_mock):
+async def test_the_options_flow_stores_the_picks_per_alarm(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    subentry = alarm_subentry(entry)
 
-    flow = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, SUBENTRY_ALARM),
-        context={"source": "reconfigure", "subentry_id": subentry.subentry_id},
-    )
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
     assert flow["type"] == "form"
-    assert flow["step_id"] == "reconfigure"
+    assert flow["step_id"] == "sensors"
+    assert flow["description_placeholders"] == {"alarm": "Front"}
 
-    result = await hass.config_entries.subentries.async_configure(
+    result = await hass.config_entries.options.async_configure(
         flow["flow_id"], {CONF_SENSORS: ["binary_sensor.front_door"]}
     )
-    assert result["type"] == "abort"
-    assert result["reason"] == "reconfigure_successful"
-    assert alarm_subentry(entry).data[CONF_SENSORS] == ["binary_sensor.front_door"]
+    assert result["type"] == "create_entry"
+    assert entry.options[CONF_READINESS] == {"a1": ["binary_sensor.front_door"]}
+
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
+    assert entry.options[CONF_READINESS] == {}
 
 
-async def test_alarms_cannot_be_added_by_hand(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, SUBENTRY_ALARM), context={"source": "user"}
+async def test_the_options_flow_asks_which_alarm_when_there_are_several(hass, aioclient_mock):
+    body = {
+        "error": False,
+        "data": {
+            "version": "1.0.0",
+            "locations": [
+                {
+                    "id": "loc-home",
+                    "name": "Home",
+                    "alarms": [
+                        {"id": "a1", "name": "Front", "modes": []},
+                        {"id": "a2", "name": "Garage", "modes": []},
+                    ],
+                    "panicButtons": [],
+                }
+            ],
+        },
+    }
+    aioclient_mock.get(DESCRIBE, json=body)
+    aioclient_mock.get(STATE, json=STATE_BODY)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="loc-home",
+        title="Home",
+        data={CONF_API_KEY: "oa_x", CONF_LOCATION_ID: "loc-home", CONF_LOCATION_NAME: "Home"},
     )
-    assert result["type"] == "abort"
-    assert result["reason"] == "alarms_come_from_the_console"
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    assert flow["step_id"] == "init"
+
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"alarm": "a2"})
+    assert flow["step_id"] == "sensors"
+    assert flow["description_placeholders"] == {"alarm": "Garage"}
+
+    result = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {CONF_SENSORS: ["binary_sensor.garage_door"]}
+    )
+    assert result["type"] == "create_entry"
+    assert entry.options[CONF_READINESS] == {"a2": ["binary_sensor.garage_door"]}

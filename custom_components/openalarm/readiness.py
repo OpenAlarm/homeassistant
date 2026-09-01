@@ -19,7 +19,7 @@ from homeassistant.helpers.target import (
     async_extract_referenced_entity_ids,
 )
 
-from .const import CONF_SENSORS
+from .const import CONF_READINESS
 
 DOMAIN_PREFIX = "binary_sensor."
 
@@ -38,11 +38,12 @@ def async_check_ready(
     hass: HomeAssistant,
     entry: ConfigEntry,
     device: dr.DeviceEntry | None,
+    alarm_id: str,
     alarm_name: str,
 ) -> None:
     """Raise unless every sensor the alarm watches reads clear.
 
-    Three sources combine: the sensors picked on the alarm's subentry, and
+    Three sources combine: the sensors picked for the alarm in the options, and
     the sensors in the area or carrying the labels set on the alarm's device
     in Home Assistant's standard device settings. Picked sensors count as
     they are, since the user chose them. Area and label expansion keeps only
@@ -54,20 +55,13 @@ def async_check_ready(
     arming even when its group reads clear - a group only goes unavailable
     when every member is, which would let one dead sensor hide.
     """
-    if device is None:
-        return
-    picked: list[str] = []
-    if device.config_subentry_id:
-        subentry = entry.subentries.get(device.config_subentry_id)
-        if subentry is not None:
-            picked = list(subentry.data.get(CONF_SENSORS) or [])
-
+    picked = list((entry.options.get(CONF_READINESS) or {}).get(alarm_id) or [])
     problems = _problems(hass, sorted(picked), set(), strict=True)
 
     selection = TargetSelection(
         {
-            "area_id": [device.area_id] if device.area_id else [],
-            "label_id": sorted(device.labels),
+            "area_id": [device.area_id] if device and device.area_id else [],
+            "label_id": sorted(device.labels) if device else [],
         }
     )
     if selection.has_any_target:

@@ -18,7 +18,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import OpenAlarmConfigEntry, OpenAlarmData, subentry_for
+from . import OpenAlarmConfigEntry, OpenAlarmData
 from .api import OpenAlarmError
 from .const import DOMAIN, KIND_ALARM
 from .coordinator import OpenAlarmStateCoordinator
@@ -55,16 +55,14 @@ async def async_setup_entry(
 
     @callback
     def _sync() -> None:
+        fresh: list[OpenAlarmPanel] = []
         for alarm in data.inventory.alarms():
             alarm_id = alarm.get("id")
-            if not alarm_id or alarm_id in known:
-                continue
-            known.add(alarm_id)
-            subentry = subentry_for(entry, alarm_id)
-            async_add_entities(
-                [OpenAlarmPanel(data, alarm_id)],
-                config_subentry_id=subentry.subentry_id if subentry else None,
-            )
+            if alarm_id and alarm_id not in known:
+                known.add(alarm_id)
+                fresh.append(OpenAlarmPanel(data, alarm_id))
+        if fresh:
+            async_add_entities(fresh)
 
     _sync()
     entry.async_on_unload(data.inventory.async_add_listener(_sync))
@@ -190,7 +188,11 @@ class OpenAlarmPanel(
             else None
         )
         async_check_ready(
-            self.hass, self.coordinator.config_entry, device, name or self.alarm_id
+            self.hass,
+            self.coordinator.config_entry,
+            device,
+            self.alarm_id,
+            name or self.alarm_id,
         )
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:

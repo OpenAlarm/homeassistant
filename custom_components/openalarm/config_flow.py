@@ -11,8 +11,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    ConfigSubentryFlow,
-    SubentryFlowResult,
+    OptionsFlow,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,13 +29,14 @@ from homeassistant.helpers.selector import (
 
 from .api import InvalidAuth, OpenAlarmClient, OpenAlarmError
 from .const import (
+    CONF_ALARM,
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
+    CONF_READINESS,
     CONF_SENSORS,
     DEFAULT_BASE_URL,
     DOMAIN,
-    SUBENTRY_ALARM,
 )
 
 API_KEY_SELECTOR = TextSelector(
@@ -62,12 +62,10 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
         self._base_url: str = DEFAULT_BASE_URL
         self._locations: list[dict[str, Any]] = []
 
-    @classmethod
+    @staticmethod
     @callback
-    def async_get_supported_subentry_types(
-        cls, config_entry: ConfigEntry
-    ) -> dict[str, type[ConfigSubentryFlow]]:
-        return {SUBENTRY_ALARM: AlarmSubentryFlow}
+    def async_get_options_flow(config_entry: ConfigEntry) -> OpenAlarmOptionsFlow:
+        return OpenAlarmOptionsFlow()
 
     async def _describe(self, api_key: str, base_url: str) -> list[dict[str, Any]]:
         client = OpenAlarmClient(async_get_clientsession(self.hass), api_key, base_url)
@@ -199,34 +197,77 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
         return f"{name} ({', '.join(parts)})" if parts else str(name)
 
 
-class AlarmSubentryFlow(ConfigSubentryFlow):
-    """One alarm's own settings: the sensors that must be clear to arm.
 
-    Alarms are discovered from the console, so there is nothing to add by
-    hand; the subentries exist as soon as the location loads, and this flow
-    only reconfigures them.
-    """
+class OpenAlarmOptionsFlow(OptionsFlow):
+    """Per alarm, the sensors that must be clear before it arms."""
 
-    async def async_step_user(
+    def __init__(self) -> None:
+        self._alarm_id: str | None = None
+        self._alarm_name: str | None = None
+
+    def _alarms(self) -> list[dict[str, Any]]:
+        data = getattr(self.config_entry, "runtime_data", None)
+        if data is None:
+            return []
+        return [a for a in data.inventory.alarms() if a.get("id")]
+
+    async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
-        return self.async_abort(reason="alarms_come_from_the_console")
+    ) -> ConfigFlowResult:
+        alarms = self._alarms()
+        if not alarms:
+            return self.async_abort(reason="not_loaded")
 
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
-        entry = self._get_entry()
-        subentry = self._get_reconfigure_subentry()
         if user_input is not None:
-            return self.async_update_and_abort(
-                entry,
-                subentry,
-                data_updates={CONF_SENSORS: list(user_input.get(CONF_SENSORS) or [])},
+            self._alarm_id = user_input[CONF_ALARM]
+        elif len(alarms) == 1:
+            self._alarm_id = alarms[0]["id"]
+
+        if self._alarm_id is not None:
+            self._alarm_name = next(
+                (a.get("name") or a["id"] for a in alarms if a["id"] == self._alarm_id),
+                self._alarm_id,
             )
+            return await self.async_step_sensors()
+
         return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=self.add_suggested_values_to_schema(
-                SENSORS_SCHEMA, subentry.data
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_ALARM): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                SelectOptionDict(
+                                    value=alarm["id"],
+                                    label=alarm.get("name") or alarm["id"],
+                                )
+                                for alarm in alarms
+                            ],
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    )
+                }
             ),
-            description_placeholders={"alarm": subentry.title},
+        )
+
+    async def async_step_sensors(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        readiness = dict(self.config_entry.options.get(CONF_READINESS) or {})
+        if user_input is not None:
+            picked = list(user_input.get(CONF_SENSORS) or [])
+            if picked:
+                readiness[self._alarm_id] = picked
+            else:
+                readiness.pop(self._alarm_id, None)
+            return self.async_create_entry(
+                data={**self.config_entry.options, CONF_READINESS: readiness}
+            )
+
+        return self.async_show_form(
+            step_id="sensors",
+            data_schema=self.add_suggested_values_to_schema(
+                SENSORS_SCHEMA, {CONF_SENSORS: readiness.get(self._alarm_id) or []}
+            ),
+            description_placeholders={"alarm": self._alarm_name or ""},
         )

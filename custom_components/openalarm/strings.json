@@ -110,25 +110,25 @@
       }
     }
   },
-  "config_subentries": {
-    "alarm": {
-      "entry_type": "Alarm",
-      "initiate_flow": {
-        "user": "Add alarm"
-      },
-      "step": {
-        "reconfigure": {
-          "title": "Sensors that must be clear",
-          "description": "{alarm} refuses to arm while any of these is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough. Sensors in this alarm's area, or carrying its labels, are checked as well; set those on the alarm's device.",
-          "data": {
-            "sensors": "Sensors"
-          }
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sensors that must be clear",
+        "description": "Pick the alarm to configure:",
+        "data": {
+          "alarm": "Alarm"
         }
       },
-      "abort": {
-        "alarms_come_from_the_console": "Alarms are created in the OpenAlarm console and appear here on their own. To set an alarm's sensors, reconfigure the alarm instead.",
-        "reconfigure_successful": "Sensors saved."
+      "sensors": {
+        "title": "Sensors that must be clear",
+        "description": "{alarm} refuses to arm while any of these is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough. Sensors in this alarm's area, or carrying its labels, are checked as well; set those on the alarm's device. Leave empty to arm unconditionally.",
+        "data": {
+          "sensors": "Sensors"
+        }
       }
+    },
+    "abort": {
+      "not_loaded": "This location is not loaded, so its alarms cannot be listed. Try again once the integration has started."
     }
   }
 }
