@@ -113,7 +113,6 @@
   "options": {
     "step": {
       "init": {
-        "title": "Sensors that must be clear",
         "data": {
           "alarm": "Pick the alarm to configure:"
         }
