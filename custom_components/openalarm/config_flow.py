@@ -22,6 +22,7 @@ from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -148,6 +149,8 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
                                 )
                                 for location in self._locations
                             ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            sort=True,
                         )
                     )
                 }
@@ -269,6 +272,8 @@ class OpenAlarmOptionsFlow(OptionsFlow):
                                 )
                                 for kind, trigger_id, name in targets
                             ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            sort=True,
                         )
                     )
                 }
