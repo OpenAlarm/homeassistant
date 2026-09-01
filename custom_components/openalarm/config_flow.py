@@ -14,6 +14,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -44,10 +45,19 @@ API_KEY_SELECTOR = TextSelector(
     TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
 )
 
-SENSORS_SCHEMA = vol.Schema(
+SECTION_SENSOR_CHECK = "sensor_check"
+
+ALARM_SETTINGS_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_SENSORS): EntitySelector(
-            EntitySelectorConfig(domain="binary_sensor", multiple=True)
+        vol.Required(SECTION_SENSOR_CHECK): section(
+            vol.Schema(
+                {
+                    vol.Optional(CONF_SENSORS): EntitySelector(
+                        EntitySelectorConfig(domain="binary_sensor", multiple=True)
+                    )
+                }
+            ),
+            {"collapsed": False},
         )
     }
 )
@@ -242,7 +252,7 @@ class OpenAlarmOptionsFlow(OptionsFlow):
                 trigger_id,
             )
             if kind == KIND_ALARM:
-                return await self.async_step_sensors()
+                return await self.async_step_alarm()
             return self.async_abort(reason="nothing_to_configure")
 
         labels = {KIND_ALARM: "alarm", KIND_PANIC: "panic button"}
@@ -265,12 +275,14 @@ class OpenAlarmOptionsFlow(OptionsFlow):
             ),
         )
 
-    async def async_step_sensors(
+    async def async_step_alarm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         readiness = dict(self.config_entry.options.get(CONF_READINESS) or {})
         if user_input is not None:
-            picked = list(user_input.get(CONF_SENSORS) or [])
+            picked = list(
+                (user_input.get(SECTION_SENSOR_CHECK) or {}).get(CONF_SENSORS) or []
+            )
             if picked:
                 readiness[self._trigger_id] = picked
             else:
@@ -280,9 +292,14 @@ class OpenAlarmOptionsFlow(OptionsFlow):
             )
 
         return self.async_show_form(
-            step_id="sensors",
+            step_id="alarm",
             data_schema=self.add_suggested_values_to_schema(
-                SENSORS_SCHEMA, {CONF_SENSORS: readiness.get(self._trigger_id) or []}
+                ALARM_SETTINGS_SCHEMA,
+                {
+                    SECTION_SENSOR_CHECK: {
+                        CONF_SENSORS: readiness.get(self._trigger_id) or []
+                    }
+                },
             ),
-            description_placeholders={"alarm": self._name or ""},
+            description_placeholders={"name": self._name or ""},
         )

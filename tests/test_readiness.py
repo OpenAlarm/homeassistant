@@ -304,17 +304,19 @@ async def test_the_options_flow_stores_the_picks_per_alarm(hass, aioclient_mock)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
     assert flow["type"] == "form"
-    assert flow["step_id"] == "sensors"
-    assert flow["description_placeholders"] == {"alarm": "Front"}
+    assert flow["step_id"] == "alarm"
+    assert flow["description_placeholders"] == {"name": "Front"}
 
     result = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {CONF_SENSORS: ["binary_sensor.front_door"]}
+        flow["flow_id"], {"sensor_check": {CONF_SENSORS: ["binary_sensor.front_door"]}}
     )
     assert result["type"] == "create_entry"
     assert entry.options[CONF_READINESS] == {"a1": ["binary_sensor.front_door"]}
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
+    result = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {"sensor_check": {}}
+    )
     assert entry.options[CONF_READINESS] == {}
 
 
@@ -352,11 +354,11 @@ async def test_the_options_flow_asks_which_alarm_when_there_are_several(hass, ai
     assert flow["step_id"] == "init"
 
     flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"target": "alarm:a2"})
-    assert flow["step_id"] == "sensors"
-    assert flow["description_placeholders"] == {"alarm": "Garage"}
+    assert flow["step_id"] == "alarm"
+    assert flow["description_placeholders"] == {"name": "Garage"}
 
     result = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {CONF_SENSORS: ["binary_sensor.garage_door"]}
+        flow["flow_id"], {"sensor_check": {CONF_SENSORS: ["binary_sensor.garage_door"]}}
     )
     assert result["type"] == "create_entry"
     assert entry.options[CONF_READINESS] == {"a2": ["binary_sensor.garage_door"]}

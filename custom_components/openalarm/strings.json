@@ -117,11 +117,16 @@
           "target": "Pick what to configure:"
         }
       },
-      "sensors": {
-        "title": "Sensors that must be clear",
-        "description": "{alarm} refuses to arm while any of these is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough. Sensors in this alarm's area, or carrying its labels, are checked as well; set those on the alarm's device. Leave empty to arm unconditionally.",
-        "data": {
-          "sensors": "Sensors"
+      "alarm": {
+        "title": "{name} settings",
+        "sections": {
+          "sensor_check": {
+            "name": "Sensor check",
+            "description": "{name} refuses to arm while any of these sensors is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough. Sensors in this alarm's area, or carrying its labels, are checked as well; set those on the alarm's device. Leave empty to arm unconditionally.",
+            "data": {
+              "sensors": "Sensors that must be clear"
+            }
+          }
         }
       }
     },
