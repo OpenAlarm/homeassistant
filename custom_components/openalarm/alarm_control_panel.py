@@ -21,6 +21,7 @@ from . import OpenAlarmConfigEntry, OpenAlarmData
 from .api import OpenAlarmError
 from .const import DOMAIN, KIND_ALARM
 from .coordinator import OpenAlarmStateCoordinator
+from .readiness import async_check_ready
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -171,13 +172,32 @@ class OpenAlarmPanel(
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
+    def _assert_ready(self) -> None:
+        name = next(
+            (
+                alarm.get("name")
+                for alarm in self._data.inventory.alarms()
+                if alarm.get("id") == self.alarm_id
+            ),
+            None,
+        )
+        async_check_ready(
+            self.hass,
+            self.coordinator.config_entry,
+            self.alarm_id,
+            name or self.alarm_id,
+        )
+
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
+        self._assert_ready()
         await self._act("arm", "home", AlarmControlPanelState.ARMED_HOME)
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
+        self._assert_ready()
         await self._act("arm", "away", AlarmControlPanelState.ARMED_AWAY)
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
+        self._assert_ready()
         await self._act("arm", "night", AlarmControlPanelState.ARMED_NIGHT)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:

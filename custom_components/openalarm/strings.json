@@ -31,6 +31,27 @@
       "reauth_successful": "OpenAlarm reconnected."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Readiness check",
+        "description": "Pick the alarm to configure. An alarm with sensors listed refuses to arm while any of them is not clear.",
+        "data": {
+          "alarm": "Alarm"
+        }
+      },
+      "entities": {
+        "title": "Readiness check",
+        "description": "{alarm} will refuse to arm while any of these is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough to block. Leave empty to arm unconditionally.",
+        "data": {
+          "entities": "Sensors that must be clear"
+        }
+      }
+    },
+    "abort": {
+      "not_loaded": "This location is not loaded, so its alarms cannot be listed. Try again once the integration has started."
+    }
+  },
   "services": {
     "alarm_arm": {
       "name": "Arm alarm",

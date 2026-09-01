@@ -12,6 +12,7 @@ CONF_API_KEY = "api_key"
 CONF_BASE_URL = "base_url"
 CONF_LOCATION_ID = "location_id"
 CONF_LOCATION_NAME = "location_name"
+CONF_READINESS = "readiness"
 
 ATTR_MODE = "mode"
 

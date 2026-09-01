@@ -41,6 +41,7 @@ from .const import (
     SERVICE_TRIGGER,
 )
 from .coordinator import OpenAlarmCoordinator, OpenAlarmStateCoordinator
+from .readiness import async_check_ready
 from .realtime import OpenAlarmRealtime
 
 _LOGGER = logging.getLogger(__name__)
@@ -321,6 +322,14 @@ async def _run(
             names = ", ".join(str(m.get("id")) for m in known)
             raise ServiceValidationError(
                 f"{target.name} has no mode {mode}. Known modes: {names or 'none'}"
+            )
+
+        if kind == KIND_ALARM and action == "arm":
+            async_check_ready(
+                hass,
+                target.coordinator.config_entry,
+                target.trigger_id,
+                target.name,
             )
 
         try:
