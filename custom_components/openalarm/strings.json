@@ -114,7 +114,7 @@
     "step": {
       "init": {
         "data": {
-          "alarm": "Pick the alarm to configure:"
+          "target": "Pick what to configure:"
         }
       },
       "sensors": {
@@ -126,7 +126,8 @@
       }
     },
     "abort": {
-      "not_loaded": "This location is not loaded, so its alarms cannot be listed. Try again once the integration has started."
+      "not_loaded": "This location is not loaded, so its alarms cannot be listed. Try again once the integration has started.",
+      "nothing_to_configure": "There is nothing to configure for that yet."
     }
   }
 }

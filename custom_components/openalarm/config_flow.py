@@ -28,14 +28,16 @@ from homeassistant.helpers.selector import (
 
 from .api import InvalidAuth, OpenAlarmClient, OpenAlarmError
 from .const import (
-    CONF_ALARM,
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
     CONF_READINESS,
     CONF_SENSORS,
+    CONF_TARGET,
     DEFAULT_BASE_URL,
     DOMAIN,
+    KIND_ALARM,
+    KIND_PANIC,
 )
 
 API_KEY_SELECTOR = TextSelector(
@@ -197,49 +199,65 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class OpenAlarmOptionsFlow(OptionsFlow):
-    """Per alarm, the sensors that must be clear before it arms."""
+    """Settings for one alarm or panic button at a time.
+
+    The first step lists everything at the location that has settings; each
+    kind then gets its own step. Alarms carry the sensors that must be clear
+    to arm. Panic buttons have nothing to set yet, so they are not listed.
+    """
 
     def __init__(self) -> None:
-        self._alarm_id: str | None = None
-        self._alarm_name: str | None = None
+        self._kind: str | None = None
+        self._trigger_id: str | None = None
+        self._name: str | None = None
 
-    def _alarms(self) -> list[dict[str, Any]]:
+    def _targets(self) -> list[tuple[str, str, str]]:
         data = getattr(self.config_entry, "runtime_data", None)
         if data is None:
             return []
-        return [a for a in data.inventory.alarms() if a.get("id")]
+        return [
+            (KIND_ALARM, alarm["id"], alarm.get("name") or alarm["id"])
+            for alarm in data.inventory.alarms()
+            if alarm.get("id")
+        ]
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        alarms = self._alarms()
-        if not alarms:
+        targets = self._targets()
+        if not targets:
             return self.async_abort(reason="not_loaded")
 
+        picked = None
         if user_input is not None:
-            self._alarm_id = user_input[CONF_ALARM]
-        elif len(alarms) == 1:
-            self._alarm_id = alarms[0]["id"]
+            picked = user_input[CONF_TARGET]
+        elif len(targets) == 1:
+            picked = f"{targets[0][0]}:{targets[0][1]}"
 
-        if self._alarm_id is not None:
-            self._alarm_name = next(
-                (a.get("name") or a["id"] for a in alarms if a["id"] == self._alarm_id),
-                self._alarm_id,
+        if picked is not None:
+            kind, _, trigger_id = picked.partition(":")
+            self._kind, self._trigger_id = kind, trigger_id
+            self._name = next(
+                (n for k, i, n in targets if k == kind and i == trigger_id),
+                trigger_id,
             )
-            return await self.async_step_sensors()
+            if kind == KIND_ALARM:
+                return await self.async_step_sensors()
+            return self.async_abort(reason="nothing_to_configure")
 
+        labels = {KIND_ALARM: "alarm", KIND_PANIC: "panic button"}
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_ALARM): SelectSelector(
+                    vol.Required(CONF_TARGET): SelectSelector(
                         SelectSelectorConfig(
                             options=[
                                 SelectOptionDict(
-                                    value=alarm["id"],
-                                    label=alarm.get("name") or alarm["id"],
+                                    value=f"{kind}:{trigger_id}",
+                                    label=f"{name} ({labels[kind]})",
                                 )
-                                for alarm in alarms
+                                for kind, trigger_id, name in targets
                             ],
                         )
                     )
@@ -254,9 +272,9 @@ class OpenAlarmOptionsFlow(OptionsFlow):
         if user_input is not None:
             picked = list(user_input.get(CONF_SENSORS) or [])
             if picked:
-                readiness[self._alarm_id] = picked
+                readiness[self._trigger_id] = picked
             else:
-                readiness.pop(self._alarm_id, None)
+                readiness.pop(self._trigger_id, None)
             return self.async_create_entry(
                 data={**self.config_entry.options, CONF_READINESS: readiness}
             )
@@ -264,7 +282,7 @@ class OpenAlarmOptionsFlow(OptionsFlow):
         return self.async_show_form(
             step_id="sensors",
             data_schema=self.add_suggested_values_to_schema(
-                SENSORS_SCHEMA, {CONF_SENSORS: readiness.get(self._alarm_id) or []}
+                SENSORS_SCHEMA, {CONF_SENSORS: readiness.get(self._trigger_id) or []}
             ),
-            description_placeholders={"alarm": self._alarm_name or ""},
+            description_placeholders={"alarm": self._name or ""},
         )

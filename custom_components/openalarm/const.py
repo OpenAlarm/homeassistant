@@ -13,7 +13,7 @@ CONF_BASE_URL = "base_url"
 CONF_LOCATION_ID = "location_id"
 CONF_LOCATION_NAME = "location_name"
 CONF_READINESS = "readiness"
-CONF_ALARM = "alarm"
+CONF_TARGET = "target"
 CONF_SENSORS = "sensors"
 
 ATTR_MODE = "mode"

@@ -351,7 +351,7 @@ async def test_the_options_flow_asks_which_alarm_when_there_are_several(hass, ai
     flow = await hass.config_entries.options.async_init(entry.entry_id)
     assert flow["step_id"] == "init"
 
-    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"alarm": "a2"})
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"target": "alarm:a2"})
     assert flow["step_id"] == "sensors"
     assert flow["description_placeholders"] == {"alarm": "Garage"}
 
