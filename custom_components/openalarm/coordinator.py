@@ -93,7 +93,7 @@ class OpenAlarmStateCoordinator(DataUpdateCoordinator[dict[str, str]]):
         )
         self.client = client
 
-    async def _async_update_data(self) -> dict[str, str]:
+    async def _async_update_data(self) -> dict[str, dict[str, str | None]]:
         try:
             data = await self.client.state()
         except InvalidAuth as err:
@@ -101,7 +101,11 @@ class OpenAlarmStateCoordinator(DataUpdateCoordinator[dict[str, str]]):
         except OpenAlarmError as err:
             raise UpdateFailed(str(err)) from err
         return {
-            alarm["id"]: str(alarm.get("state") or "disarmed")
+            alarm["id"]: {
+                "state": str(alarm.get("state") or "disarmed"),
+                "mode": alarm.get("mode") or None,
+                "mode_name": alarm.get("modeName") or None,
+            }
             for alarm in data.get("alarms") or []
             if alarm.get("id")
         }

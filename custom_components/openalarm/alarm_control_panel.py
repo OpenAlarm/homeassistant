@@ -109,8 +109,17 @@ class OpenAlarmPanel(
                 self._pending = None
         super()._handle_coordinator_update()
 
+    def _server_entry(self) -> dict[str, str | None]:
+        return (self.coordinator.data or {}).get(self.alarm_id) or {}
+
     def _server_state(self) -> AlarmControlPanelState | None:
-        return SERVER_TO_HA.get((self.coordinator.data or {}).get(self.alarm_id))
+        return SERVER_TO_HA.get(self._server_entry().get("state"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | None]:
+        """The live mode, so automations can branch on it directly."""
+        entry = self._server_entry()
+        return {"mode": entry.get("mode"), "mode_name": entry.get("mode_name")}
 
     @property
     def available(self) -> bool:
