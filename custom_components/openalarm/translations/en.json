@@ -114,9 +114,8 @@
     "step": {
       "init": {
         "title": "Sensors that must be clear",
-        "description": "Pick the alarm to configure:",
         "data": {
-          "alarm": "Alarm"
+          "alarm": "Pick the alarm to configure:"
         }
       },
       "sensors": {
