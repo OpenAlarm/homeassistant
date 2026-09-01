@@ -16,12 +16,13 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
-    EntitySelector,
-    EntitySelectorConfig,
+    EntityFilterSelectorConfig,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TargetSelector,
+    TargetSelectorConfig,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -37,8 +38,15 @@ from .const import (
     DOMAIN,
 )
 
-CONF_ALARM = "alarm"
-CONF_ENTITIES = "entities"
+OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_READINESS): TargetSelector(
+            TargetSelectorConfig(
+                entity=[EntityFilterSelectorConfig(domain="binary_sensor")]
+            )
+        )
+    }
+)
 
 
 API_KEY_SELECTOR = TextSelector(
@@ -190,90 +198,18 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
             parts.append(f"{panics} panic button" + ("s" if panics != 1 else ""))
         return f"{name} ({', '.join(parts)})" if parts else str(name)
 
+
 class OpenAlarmOptionsFlow(OptionsFlow):
-    """Pick, per alarm, the sensors that must be clear before it arms."""
-
-    def __init__(self) -> None:
-        self._alarm_id: str | None = None
-        self._alarm_name: str | None = None
-
-    def _alarms(self) -> list[dict[str, Any]]:
-        data = getattr(self.config_entry, "runtime_data", None)
-        if data is None:
-            return []
-        return [a for a in data.inventory.alarms() if a.get("id")]
+    """Pick the sensors that must be clear before any alarm here arms."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        alarms = self._alarms()
-        if not alarms:
-            return self.async_abort(reason="not_loaded")
-
         if user_input is not None:
-            self._alarm_id = user_input[CONF_ALARM]
-            self._alarm_name = next(
-                (
-                    a.get("name") or a["id"]
-                    for a in alarms
-                    if a["id"] == self._alarm_id
-                ),
-                self._alarm_id,
-            )
-            return await self.async_step_entities()
-
-        if len(alarms) == 1:
-            self._alarm_id = alarms[0]["id"]
-            self._alarm_name = alarms[0].get("name") or self._alarm_id
-            return await self.async_step_entities()
-
+            return self.async_create_entry(data=user_input)
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_ALARM): SelectSelector(
-                        SelectSelectorConfig(
-                            options=[
-                                SelectOptionDict(
-                                    value=alarm["id"],
-                                    label=alarm.get("name") or alarm["id"],
-                                )
-                                for alarm in alarms
-                            ],
-                            mode=SelectSelectorMode.LIST,
-                        )
-                    )
-                }
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA, self.config_entry.options
             ),
-        )
-
-    async def async_step_entities(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if user_input is not None:
-            readiness = dict(self.config_entry.options.get(CONF_READINESS) or {})
-            selected = list(user_input.get(CONF_ENTITIES) or [])
-            if selected:
-                readiness[self._alarm_id] = selected
-            else:
-                readiness.pop(self._alarm_id, None)
-            options = dict(self.config_entry.options)
-            options[CONF_READINESS] = readiness
-            return self.async_create_entry(title="", data=options)
-
-        current = (self.config_entry.options.get(CONF_READINESS) or {}).get(
-            self._alarm_id
-        ) or []
-        return self.async_show_form(
-            step_id="entities",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_ENTITIES, default=list(current)
-                    ): EntitySelector(
-                        EntitySelectorConfig(domain="binary_sensor", multiple=True)
-                    )
-                }
-            ),
-            description_placeholders={"alarm": self._alarm_name or ""},
         )

@@ -35,21 +35,11 @@
     "step": {
       "init": {
         "title": "Readiness check",
-        "description": "Pick the alarm to configure. An alarm with sensors listed refuses to arm while any of them is not clear.",
+        "description": "Every alarm at this location refuses to arm while any selected binary sensor is on, unavailable, or unknown, and the error names the sensor at fault. Pick sensors directly, or the devices, areas, floors, or labels that hold them. Groups are checked member by member, so one open door or one dead sensor is enough to block. Leave empty to arm unconditionally.",
         "data": {
-          "alarm": "Alarm"
-        }
-      },
-      "entities": {
-        "title": "Readiness check",
-        "description": "{alarm} will refuse to arm while any of these is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough to block. Leave empty to arm unconditionally.",
-        "data": {
-          "entities": "Sensors that must be clear"
+          "readiness": "Sensors that must be clear"
         }
       }
-    },
-    "abort": {
-      "not_loaded": "This location is not loaded, so its alarms cannot be listed. Try again once the integration has started."
     }
   },
   "services": {

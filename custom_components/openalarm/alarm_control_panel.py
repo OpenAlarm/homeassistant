@@ -182,10 +182,7 @@ class OpenAlarmPanel(
             None,
         )
         async_check_ready(
-            self.hass,
-            self.coordinator.config_entry,
-            self.alarm_id,
-            name or self.alarm_id,
+            self.hass, self.coordinator.config_entry, name or self.alarm_id
         )
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:

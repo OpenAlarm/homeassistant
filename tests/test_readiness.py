@@ -2,8 +2,13 @@
 
 import pytest
 
+from homeassistant.const import EntityCategory
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    label_registry as lr,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.openalarm.const import (
@@ -85,7 +90,7 @@ async def arm_panel(hass):
     await hass.async_block_till_done()
 
 
-GATED = {CONF_READINESS: {"a1": ["binary_sensor.front_door"]}}
+GATED = {CONF_READINESS: {"entity_id": ["binary_sensor.front_door"]}}
 
 
 async def test_an_open_sensor_blocks_arming_with_its_name(hass, aioclient_mock):
@@ -130,7 +135,7 @@ async def test_a_dead_member_blocks_even_when_its_group_reads_clear(
     await setup_entry(
         hass,
         aioclient_mock,
-        options={CONF_READINESS: {"a1": ["binary_sensor.doors"]}},
+        options={CONF_READINESS: {"entity_id": ["binary_sensor.doors"]}},
     )
     hass.states.async_set(
         "binary_sensor.doors",
@@ -153,7 +158,7 @@ async def test_nested_groups_name_the_leaf_at_fault(hass, aioclient_mock):
     await setup_entry(
         hass,
         aioclient_mock,
-        options={CONF_READINESS: {"a1": ["binary_sensor.not_clear"]}},
+        options={CONF_READINESS: {"entity_id": ["binary_sensor.not_clear"]}},
     )
     hass.states.async_set(
         "binary_sensor.not_clear",
@@ -177,7 +182,7 @@ async def test_a_missing_entity_blocks_arming(hass, aioclient_mock):
     await setup_entry(
         hass,
         aioclient_mock,
-        options={CONF_READINESS: {"a1": ["binary_sensor.gone"]}},
+        options={CONF_READINESS: {"entity_id": ["binary_sensor.gone"]}},
     )
 
     with pytest.raises(
@@ -225,21 +230,43 @@ async def test_disarm_is_never_gated(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "disarmed"
 
 
-async def test_the_options_flow_stores_the_gate(hass, aioclient_mock):
+async def test_a_label_resolves_to_its_diagnostic_sensors(hass, aioclient_mock):
+    label = lr.async_get(hass).async_create("Perimeter")
+    registry = er.async_get(hass)
+    tamper = registry.async_get_or_create(
+        "binary_sensor",
+        "test",
+        "study_tamper",
+        suggested_object_id="study_tamper",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+    registry.async_update_entity(tamper.entity_id, labels={label.label_id})
+    await setup_entry(
+        hass,
+        aioclient_mock,
+        options={CONF_READINESS: {"label_id": [label.label_id]}},
+    )
+    hass.states.async_set(tamper.entity_id, "on", {"friendly_name": "Study Tamper"})
+
+    with pytest.raises(ServiceValidationError, match="Study Tamper is not clear"):
+        await arm_panel(hass)
+
+
+async def test_the_options_flow_stores_the_target(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
     assert flow["type"] == "form"
-    assert flow["step_id"] == "entities"
+    assert flow["step_id"] == "init"
 
+    target = {"entity_id": ["binary_sensor.front_door"], "label_id": ["perimeter"]}
     result = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {"entities": ["binary_sensor.front_door"]}
+        flow["flow_id"], {CONF_READINESS: target}
     )
     assert result["type"] == "create_entry"
-    assert entry.options[CONF_READINESS] == {"a1": ["binary_sensor.front_door"]}
+    assert entry.options[CONF_READINESS] == target
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {"entities": []}
-    )
-    assert entry.options[CONF_READINESS] == {}
+    result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
+    assert result["type"] == "create_entry"
+    assert CONF_READINESS not in entry.options

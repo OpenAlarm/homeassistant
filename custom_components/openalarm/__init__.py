@@ -325,12 +325,7 @@ async def _run(
             )
 
         if kind == KIND_ALARM and action == "arm":
-            async_check_ready(
-                hass,
-                target.coordinator.config_entry,
-                target.trigger_id,
-                target.name,
-            )
+            async_check_ready(hass, target.coordinator.config_entry, target.name)
 
         try:
             body: dict[str, Any] = await target.coordinator.client.act(
