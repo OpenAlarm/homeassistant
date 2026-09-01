@@ -122,7 +122,7 @@
         "sections": {
           "sensor_check": {
             "name": "Sensor check",
-            "description": "{name} refuses to arm while any of these sensors is on, unavailable, or unknown, and the error names the sensor at fault. Groups are checked member by member, so one open door or one dead sensor is enough. Sensors in this alarm's area, or carrying its labels, are checked as well; set those on the alarm's device. Leave empty to arm unconditionally.",
+            "description": "Checks that these sensors are clear before arming. If any is not, arming fails and the message names the sensor.",
             "data": {
               "sensors": "Sensors that must be clear"
             }
