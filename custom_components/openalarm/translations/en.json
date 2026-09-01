@@ -122,9 +122,9 @@
         "sections": {
           "sensor_check": {
             "name": "Sensor check",
-            "description": "Checks that these sensors are clear before arming. If any is not, arming fails and the message names the sensor.",
+            "description": "Checks that these sensors are clear before arming. If any is not clear, arming fails and Home Assistant reports which sensor.",
             "data": {
-              "sensors": "Sensors that must be clear"
+              "sensors": "Sensors"
             }
           }
         }
