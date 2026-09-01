@@ -13,6 +13,7 @@ from homeassistant.components.alarm_control_panel import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -181,9 +182,12 @@ class OpenAlarmPanel(
             ),
             None,
         )
-        async_check_ready(
-            self.hass, self.coordinator.config_entry, name or self.alarm_id
+        device = (
+            dr.async_get(self.hass).async_get(self.device_entry.id)
+            if self.device_entry
+            else None
         )
+        async_check_ready(self.hass, device, name or self.alarm_id)
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         self._assert_ready()

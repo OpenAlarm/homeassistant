@@ -7,22 +7,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
-from homeassistant.core import callback
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
-    EntityFilterSelectorConfig,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TargetSelector,
-    TargetSelectorConfig,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -33,21 +24,9 @@ from .const import (
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
-    CONF_READINESS,
     DEFAULT_BASE_URL,
     DOMAIN,
 )
-
-OPTIONS_SCHEMA = vol.Schema(
-    {
-        vol.Optional(CONF_READINESS): TargetSelector(
-            TargetSelectorConfig(
-                entity=[EntityFilterSelectorConfig(domain="binary_sensor")]
-            )
-        )
-    }
-)
-
 
 API_KEY_SELECTOR = TextSelector(
     TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
@@ -63,11 +42,6 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
         self._api_key: str | None = None
         self._base_url: str = DEFAULT_BASE_URL
         self._locations: list[dict[str, Any]] = []
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OpenAlarmOptionsFlow:
-        return OpenAlarmOptionsFlow()
 
     async def _describe(self, api_key: str, base_url: str) -> list[dict[str, Any]]:
         client = OpenAlarmClient(async_get_clientsession(self.hass), api_key, base_url)
@@ -198,18 +172,3 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
             parts.append(f"{panics} panic button" + ("s" if panics != 1 else ""))
         return f"{name} ({', '.join(parts)})" if parts else str(name)
 
-
-class OpenAlarmOptionsFlow(OptionsFlow):
-    """Pick the sensors that must be clear before any alarm here arms."""
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
-        return self.async_show_form(
-            step_id="init",
-            data_schema=self.add_suggested_values_to_schema(
-                OPTIONS_SCHEMA, self.config_entry.options
-            ),
-        )

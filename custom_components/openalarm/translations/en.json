@@ -109,16 +109,5 @@
         "night": "Night"
       }
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Readiness check",
-        "description": "Every alarm at this location refuses to arm while any selected binary sensor is on, unavailable, or unknown, and the error names the sensor at fault. Pick sensors directly, or the devices, areas, floors, or labels that hold them. Groups are checked member by member, so one open door or one dead sensor is enough to block. Leave empty to arm unconditionally.",
-        "data": {
-          "readiness": "Sensors that must be clear"
-        }
-      }
-    }
   }
 }

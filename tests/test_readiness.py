@@ -5,6 +5,7 @@ import pytest
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import (
+    area_registry as ar,
     device_registry as dr,
     entity_registry as er,
     label_registry as lr,
@@ -15,7 +16,6 @@ from custom_components.openalarm.const import (
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
-    CONF_READINESS,
     DEFAULT_BASE_URL,
     DOMAIN,
 )
@@ -60,7 +60,7 @@ STATE_BODY = {
 ENTITY = "alarm_control_panel.front"
 
 
-async def setup_entry(hass, aioclient_mock, options=None):
+async def setup_entry(hass, aioclient_mock):
     aioclient_mock.get(DESCRIBE, json=BODY)
     aioclient_mock.get(STATE, json=STATE_BODY)
     entry = MockConfigEntry(
@@ -72,12 +72,44 @@ async def setup_entry(hass, aioclient_mock, options=None):
             CONF_LOCATION_ID: "loc-home",
             CONF_LOCATION_NAME: "Home",
         },
-        options=options or {},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry
+
+
+def alarm_device(hass, entry):
+    registry = dr.async_get(hass)
+    return next(
+        d
+        for d in dr.async_entries_for_config_entry(registry, entry.entry_id)
+        if (DOMAIN, "alarm:a1") in d.identifiers
+    )
+
+
+def place_alarm(hass, entry, area_id=None, labels=None):
+    device = alarm_device(hass, entry)
+    return dr.async_get(hass).async_update_device(
+        device.id, area_id=area_id, labels=labels or set()
+    )
+
+
+def sensor(hass, object_id, name, state, device_class=None, area_id=None, labels=None, category=None):
+    registry = er.async_get(hass)
+    entry = registry.async_get_or_create(
+        "binary_sensor",
+        "test",
+        object_id,
+        suggested_object_id=object_id,
+        entity_category=category,
+    )
+    registry.async_update_entity(entry.entity_id, area_id=area_id, labels=labels or set())
+    attributes = {"friendly_name": name}
+    if device_class:
+        attributes["device_class"] = device_class
+    hass.states.async_set(entry.entity_id, state, attributes)
+    return entry.entity_id
 
 
 async def arm_panel(hass):
@@ -90,14 +122,11 @@ async def arm_panel(hass):
     await hass.async_block_till_done()
 
 
-GATED = {CONF_READINESS: {"entity_id": ["binary_sensor.front_door"]}}
-
-
-async def test_an_open_sensor_blocks_arming_with_its_name(hass, aioclient_mock):
-    await setup_entry(hass, aioclient_mock, options=GATED)
-    hass.states.async_set(
-        "binary_sensor.front_door", "on", {"friendly_name": "Front Door"}
-    )
+async def test_an_open_door_in_the_alarms_area_blocks_arming(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    area = ar.async_get(hass).async_get_or_create("Main Floor")
+    place_alarm(hass, entry, area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "on", "door", area_id=area.id)
 
     with pytest.raises(ServiceValidationError, match="Front Door is not clear"):
         await arm_panel(hass)
@@ -105,11 +134,11 @@ async def test_an_open_sensor_blocks_arming_with_its_name(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "disarmed"
 
 
-async def test_a_clear_sensor_lets_the_arm_through(hass, aioclient_mock):
-    await setup_entry(hass, aioclient_mock, options=GATED)
-    hass.states.async_set(
-        "binary_sensor.front_door", "off", {"friendly_name": "Front Door"}
-    )
+async def test_a_clear_area_lets_the_arm_through(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    area = ar.async_get(hass).async_get_or_create("Main Floor")
+    place_alarm(hass, entry, area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "off", "door", area_id=area.id)
     aioclient_mock.get(ARM, json={"error": False, "traceId": "t1", "data": {}})
 
     await arm_panel(hass)
@@ -117,11 +146,9 @@ async def test_a_clear_sensor_lets_the_arm_through(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "armed_home"
 
 
-async def test_an_unconfigured_alarm_arms_unconditionally(hass, aioclient_mock):
+async def test_an_unplaced_alarm_arms_unconditionally(hass, aioclient_mock):
     await setup_entry(hass, aioclient_mock)
-    hass.states.async_set(
-        "binary_sensor.front_door", "on", {"friendly_name": "Front Door"}
-    )
+    sensor(hass, "front_door", "Front Door", "on", "door")
     aioclient_mock.get(ARM, json={"error": False, "traceId": "t1", "data": {}})
 
     await arm_panel(hass)
@@ -129,79 +156,73 @@ async def test_an_unconfigured_alarm_arms_unconditionally(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "armed_home"
 
 
-async def test_a_dead_member_blocks_even_when_its_group_reads_clear(
-    hass, aioclient_mock
-):
-    await setup_entry(
+async def test_motion_in_the_area_does_not_block(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    area = ar.async_get(hass).async_get_or_create("Main Floor")
+    place_alarm(hass, entry, area_id=area.id)
+    sensor(hass, "hall_motion", "Hall Motion", "on", "motion", area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "off", "door", area_id=area.id)
+    aioclient_mock.get(ARM, json={"error": False, "traceId": "t1", "data": {}})
+
+    await arm_panel(hass)
+
+    assert hass.states.get(ENTITY).state == "armed_home"
+
+
+async def test_a_label_resolves_to_its_diagnostic_tampers(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    label = lr.async_get(hass).async_create("Perimeter")
+    place_alarm(hass, entry, labels={label.label_id})
+    sensor(
         hass,
-        aioclient_mock,
-        options={CONF_READINESS: {"entity_id": ["binary_sensor.doors"]}},
+        "study_tamper",
+        "Study Tamper",
+        "on",
+        "tamper",
+        labels={label.label_id},
+        category=EntityCategory.DIAGNOSTIC,
     )
-    hass.states.async_set(
-        "binary_sensor.doors",
-        "off",
-        {
-            "friendly_name": "Doors",
-            "entity_id": ["binary_sensor.d1", "binary_sensor.d2"],
-        },
-    )
-    hass.states.async_set("binary_sensor.d1", "off", {"friendly_name": "Main Door"})
-    hass.states.async_set(
-        "binary_sensor.d2", "unavailable", {"friendly_name": "Garage Door"}
-    )
+
+    with pytest.raises(ServiceValidationError, match="Study Tamper is not clear"):
+        await arm_panel(hass)
+
+
+async def test_a_dead_sensor_blocks_arming(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    label = lr.async_get(hass).async_create("Perimeter")
+    place_alarm(hass, entry, labels={label.label_id})
+    sensor(hass, "garage", "Garage Door", "unavailable", "garage_door", labels={label.label_id})
 
     with pytest.raises(ServiceValidationError, match="Garage Door is unavailable"):
         await arm_panel(hass)
 
 
-async def test_nested_groups_name_the_leaf_at_fault(hass, aioclient_mock):
-    await setup_entry(
-        hass,
-        aioclient_mock,
-        options={CONF_READINESS: {"entity_id": ["binary_sensor.not_clear"]}},
+async def test_a_labelled_group_is_walked_to_the_member_at_fault(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    label = lr.async_get(hass).async_create("Perimeter")
+    place_alarm(hass, entry, labels={label.label_id})
+    registry = er.async_get(hass)
+    group = registry.async_get_or_create(
+        "binary_sensor", "group", "doors", suggested_object_id="doors"
     )
+    registry.async_update_entity(group.entity_id, labels={label.label_id})
     hass.states.async_set(
-        "binary_sensor.not_clear",
-        "on",
-        {"friendly_name": "Not Clear", "entity_id": ["binary_sensor.windows"]},
+        group.entity_id,
+        "off",
+        {"friendly_name": "Doors", "entity_id": ["binary_sensor.d1", "binary_sensor.d2"]},
     )
-    hass.states.async_set(
-        "binary_sensor.windows",
-        "on",
-        {"friendly_name": "Windows", "entity_id": ["binary_sensor.w1"]},
-    )
-    hass.states.async_set(
-        "binary_sensor.w1", "on", {"friendly_name": "Study Window"}
-    )
+    hass.states.async_set("binary_sensor.d1", "off", {"friendly_name": "Main Door"})
+    hass.states.async_set("binary_sensor.d2", "unknown", {"friendly_name": "Rear Door"})
 
-    with pytest.raises(ServiceValidationError, match="Study Window is not clear"):
-        await arm_panel(hass)
-
-
-async def test_a_missing_entity_blocks_arming(hass, aioclient_mock):
-    await setup_entry(
-        hass,
-        aioclient_mock,
-        options={CONF_READINESS: {"entity_id": ["binary_sensor.gone"]}},
-    )
-
-    with pytest.raises(
-        ServiceValidationError, match="binary_sensor.gone is missing"
-    ):
+    with pytest.raises(ServiceValidationError, match="Rear Door is unknown"):
         await arm_panel(hass)
 
 
 async def test_the_custom_arm_service_is_gated_too(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock, options=GATED)
-    hass.states.async_set(
-        "binary_sensor.front_door", "on", {"friendly_name": "Front Door"}
-    )
-    registry = dr.async_get(hass)
-    device = next(
-        d
-        for d in dr.async_entries_for_config_entry(registry, entry.entry_id)
-        if (DOMAIN, "alarm:a1") in d.identifiers
-    )
+    entry = await setup_entry(hass, aioclient_mock)
+    area = ar.async_get(hass).async_get_or_create("Main Floor")
+    device = place_alarm(hass, entry, area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "on", "door", area_id=area.id)
 
     with pytest.raises(ServiceValidationError, match="Front Door is not clear"):
         await hass.services.async_call(
@@ -213,10 +234,10 @@ async def test_the_custom_arm_service_is_gated_too(hass, aioclient_mock):
 
 
 async def test_disarm_is_never_gated(hass, aioclient_mock):
-    await setup_entry(hass, aioclient_mock, options=GATED)
-    hass.states.async_set(
-        "binary_sensor.front_door", "on", {"friendly_name": "Front Door"}
-    )
+    entry = await setup_entry(hass, aioclient_mock)
+    area = ar.async_get(hass).async_get_or_create("Main Floor")
+    place_alarm(hass, entry, area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "on", "door", area_id=area.id)
     aioclient_mock.get(DISARM, json={"error": False, "traceId": "t1", "data": {}})
 
     await hass.services.async_call(
@@ -228,45 +249,3 @@ async def test_disarm_is_never_gated(hass, aioclient_mock):
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY).state == "disarmed"
-
-
-async def test_a_label_resolves_to_its_diagnostic_sensors(hass, aioclient_mock):
-    label = lr.async_get(hass).async_create("Perimeter")
-    registry = er.async_get(hass)
-    tamper = registry.async_get_or_create(
-        "binary_sensor",
-        "test",
-        "study_tamper",
-        suggested_object_id="study_tamper",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    )
-    registry.async_update_entity(tamper.entity_id, labels={label.label_id})
-    await setup_entry(
-        hass,
-        aioclient_mock,
-        options={CONF_READINESS: {"label_id": [label.label_id]}},
-    )
-    hass.states.async_set(tamper.entity_id, "on", {"friendly_name": "Study Tamper"})
-
-    with pytest.raises(ServiceValidationError, match="Study Tamper is not clear"):
-        await arm_panel(hass)
-
-
-async def test_the_options_flow_stores_the_target(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-
-    flow = await hass.config_entries.options.async_init(entry.entry_id)
-    assert flow["type"] == "form"
-    assert flow["step_id"] == "init"
-
-    target = {"entity_id": ["binary_sensor.front_door"], "label_id": ["perimeter"]}
-    result = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {CONF_READINESS: target}
-    )
-    assert result["type"] == "create_entry"
-    assert entry.options[CONF_READINESS] == target
-
-    flow = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
-    assert result["type"] == "create_entry"
-    assert CONF_READINESS not in entry.options
