@@ -7,9 +7,18 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
+)
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -24,12 +33,22 @@ from .const import (
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
+    CONF_SENSORS,
     DEFAULT_BASE_URL,
     DOMAIN,
+    SUBENTRY_ALARM,
 )
 
 API_KEY_SELECTOR = TextSelector(
     TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
+)
+
+SENSORS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_SENSORS): EntitySelector(
+            EntitySelectorConfig(domain="binary_sensor", multiple=True)
+        )
+    }
 )
 
 
@@ -42,6 +61,13 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
         self._api_key: str | None = None
         self._base_url: str = DEFAULT_BASE_URL
         self._locations: list[dict[str, Any]] = []
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_ALARM: AlarmSubentryFlow}
 
     async def _describe(self, api_key: str, base_url: str) -> list[dict[str, Any]]:
         client = OpenAlarmClient(async_get_clientsession(self.hass), api_key, base_url)
@@ -172,3 +198,35 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
             parts.append(f"{panics} panic button" + ("s" if panics != 1 else ""))
         return f"{name} ({', '.join(parts)})" if parts else str(name)
 
+
+class AlarmSubentryFlow(ConfigSubentryFlow):
+    """One alarm's own settings: the sensors that must be clear to arm.
+
+    Alarms are discovered from the console, so there is nothing to add by
+    hand; the subentries exist as soon as the location loads, and this flow
+    only reconfigures them.
+    """
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return self.async_abort(reason="alarms_come_from_the_console")
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        if user_input is not None:
+            return self.async_update_and_abort(
+                entry,
+                subentry,
+                data_updates={CONF_SENSORS: list(user_input.get(CONF_SENSORS) or [])},
+            )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                SENSORS_SCHEMA, subentry.data
+            ),
+            description_placeholders={"alarm": subentry.title},
+        )

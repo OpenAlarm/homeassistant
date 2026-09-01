@@ -16,8 +16,10 @@ from custom_components.openalarm.const import (
     CONF_API_KEY,
     CONF_LOCATION_ID,
     CONF_LOCATION_NAME,
+    CONF_SENSORS,
     DEFAULT_BASE_URL,
     DOMAIN,
+    SUBENTRY_ALARM,
 )
 
 DESCRIBE = f"{DEFAULT_BASE_URL}/v1/integration/describe"
@@ -92,6 +94,19 @@ def place_alarm(hass, entry, area_id=None, labels=None):
     device = alarm_device(hass, entry)
     return dr.async_get(hass).async_update_device(
         device.id, area_id=area_id, labels=labels or set()
+    )
+
+
+def alarm_subentry(entry):
+    return next(
+        s for s in entry.subentries.values()
+        if s.subentry_type == SUBENTRY_ALARM and s.unique_id == "a1"
+    )
+
+
+def pick_sensors(hass, entry, sensors):
+    hass.config_entries.async_update_subentry(
+        entry, alarm_subentry(entry), data={CONF_SENSORS: sensors}
     )
 
 
@@ -249,3 +264,107 @@ async def test_disarm_is_never_gated(hass, aioclient_mock):
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY).state == "disarmed"
+
+
+async def test_each_alarm_gets_a_subentry_and_its_device_lives_there(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    subentry = alarm_subentry(entry)
+    assert subentry.title == "Front"
+
+    device = alarm_device(hass, entry)
+    assert device.config_subentry_id == subentry.subentry_id
+
+    panel = er.async_get(hass).async_get(ENTITY)
+    assert panel.config_subentry_id == subentry.subentry_id
+
+
+async def test_a_device_from_before_subentries_is_moved_keeping_its_id(hass, aioclient_mock):
+    registry = dr.async_get(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="loc-home",
+        title="Home",
+        data={CONF_API_KEY: "oa_x", CONF_LOCATION_ID: "loc-home", CONF_LOCATION_NAME: "Home"},
+    )
+    entry.add_to_hass(hass)
+    old = registry.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, "alarm:a1")}, name="Front"
+    )
+    assert old.config_subentry_id is None
+
+    aioclient_mock.get(DESCRIBE, json=BODY)
+    aioclient_mock.get(STATE, json=STATE_BODY)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    moved = registry.async_get(old.id)
+    assert moved.config_subentry_id == alarm_subentry(entry).subentry_id
+    assert alarm_device(hass, entry).id == old.id
+
+
+async def test_picked_sensors_gate_arming(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    sensor(hass, "front_door", "Front Door", "on", "door")
+    pick_sensors(hass, entry, ["binary_sensor.front_door"])
+
+    with pytest.raises(ServiceValidationError, match="Front Door is not clear"):
+        await arm_panel(hass)
+
+
+async def test_picked_sensors_count_regardless_of_class(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    sensor(hass, "hall_motion", "Hall Motion", "on", "motion")
+    pick_sensors(hass, entry, ["binary_sensor.hall_motion"])
+
+    with pytest.raises(ServiceValidationError, match="Hall Motion is not clear"):
+        await arm_panel(hass)
+
+
+async def test_a_picked_sensor_that_vanished_blocks(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    pick_sensors(hass, entry, ["binary_sensor.gone"])
+
+    with pytest.raises(ServiceValidationError, match="binary_sensor.gone is missing"):
+        await arm_panel(hass)
+
+
+async def test_picked_sensors_and_area_combine(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    area = ar.async_get(hass).async_get_or_create("Garage")
+    place_alarm(hass, entry, area_id=area.id)
+    sensor(hass, "garage_door", "Garage Door", "on", "garage_door", area_id=area.id)
+    sensor(hass, "side_window", "Side Window", "unavailable", "window")
+    pick_sensors(hass, entry, ["binary_sensor.side_window"])
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await arm_panel(hass)
+    assert "Side Window is unavailable" in str(raised.value)
+    assert "Garage Door is not clear" in str(raised.value)
+
+
+async def test_the_reconfigure_flow_stores_the_picks(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    subentry = alarm_subentry(entry)
+
+    flow = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_ALARM),
+        context={"source": "reconfigure", "subentry_id": subentry.subentry_id},
+    )
+    assert flow["type"] == "form"
+    assert flow["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.subentries.async_configure(
+        flow["flow_id"], {CONF_SENSORS: ["binary_sensor.front_door"]}
+    )
+    assert result["type"] == "abort"
+    assert result["reason"] == "reconfigure_successful"
+    assert alarm_subentry(entry).data[CONF_SENSORS] == ["binary_sensor.front_door"]
+
+
+async def test_alarms_cannot_be_added_by_hand(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_ALARM), context={"source": "user"}
+    )
+    assert result["type"] == "abort"
+    assert result["reason"] == "alarms_come_from_the_console"
