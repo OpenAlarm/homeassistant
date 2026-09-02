@@ -25,7 +25,15 @@ Six actions:
 
 Your modes come from your account, including custom ones - and they show up in the arm and trigger dropdowns by their configured names, not their ids. Add or rename a mode in the OpenAlarm console and the dropdown follows on the next refresh or reload, with no reinstall.
 
-Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is the service's real state, polled every minute: arm it from anywhere else - a script, another integration, a curl - and the entity follows within that minute, and an open incident shows as triggered until it clears. (The console never arms anything, by design: it reads state, and arming arrives only through the API.) Commands reflect immediately. Custom modes are armed through `openalarm.alarm_arm` and show on the panel as armed custom; the panel's own buttons cover Home, Away and Night.
+Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is the service's real state, pushed as it changes, and an open incident shows as triggered until it clears. (The console never arms anything, by design: it reads state, and arming arrives only through the API.) Commands reflect immediately. Custom modes are armed through `openalarm.alarm_arm` and show on the panel as armed custom; the panel's own buttons cover Home, Away and Night.
+
+The panel carries two attributes, `mode` and `mode_name`: the armed mode while armed, the incident's mode while triggered, empty while disarmed. Automations branch on them with a plain state condition on the attribute - Home Assistant's own `is_armed_*` conditions read the current state, which is `triggered` during an incident, so they cannot tell Away from Home once the alarm has fired.
+
+## Sensor check
+
+Each alarm can carry a list of sensors that must be clear before it arms: Settings → Devices & Services → OpenAlarm → **Configure** → pick the alarm → **Sensor check**. If any picked sensor is on, unavailable or unknown when an arm is attempted, the arm fails before it reaches OpenAlarm, the panel stays disarmed, and the error names the sensor. Groups are checked member by member; only the sensors you picked are checked, whatever kind they are; disarming is never gated. The failure shows wherever you armed from - Home Assistant, an automation trace, or a HomeKit scene that fails and says so.
+
+The full recommended setup - inputs, responses and the trouble channel as three separate automations - is in the [Home Assistant guide](https://docs.openalarm.io/guides/home-assistant/).
 
 ## Requirements
 
