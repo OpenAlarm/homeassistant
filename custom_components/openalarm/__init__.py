@@ -78,7 +78,6 @@ class Target:
     kind: str
     trigger_id: str
     name: str
-    device: dr.DeviceEntry
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -292,7 +291,7 @@ def _resolve(hass: HomeAssistant, call: ServiceCall, kind: str) -> list[Target]:
             )
 
         targets.append(
-            Target(data.inventory, kind, trigger_id, device.name or trigger_id, device)
+            Target(data.inventory, kind, trigger_id, device.name or trigger_id)
         )
 
     if not targets:
@@ -327,11 +326,7 @@ async def _run(
 
         if kind == KIND_ALARM and action == "arm":
             async_check_ready(
-                hass,
-                target.coordinator.config_entry,
-                target.device,
-                target.trigger_id,
-                target.name,
+                hass, target.coordinator.config_entry, target.trigger_id, target.name
             )
 
         try:

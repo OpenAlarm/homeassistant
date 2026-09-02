@@ -2,14 +2,8 @@
 
 import pytest
 
-from homeassistant.const import EntityCategory
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import (
-    area_registry as ar,
-    device_registry as dr,
-    entity_registry as er,
-    label_registry as lr,
-)
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.openalarm.const import (
@@ -90,29 +84,17 @@ def alarm_device(hass, entry):
     )
 
 
-def place_alarm(hass, entry, area_id=None, labels=None):
-    device = alarm_device(hass, entry)
-    return dr.async_get(hass).async_update_device(
-        device.id, area_id=area_id, labels=labels or set()
-    )
-
-
 def pick_sensors(hass, entry, sensors):
     hass.config_entries.async_update_entry(
         entry, options={CONF_READINESS: {"a1": sensors}}
     )
 
 
-def sensor(hass, object_id, name, state, device_class=None, area_id=None, labels=None, category=None):
+def sensor(hass, object_id, name, state, device_class=None):
     registry = er.async_get(hass)
     entry = registry.async_get_or_create(
-        "binary_sensor",
-        "test",
-        object_id,
-        suggested_object_id=object_id,
-        entity_category=category,
+        "binary_sensor", "test", object_id, suggested_object_id=object_id
     )
-    registry.async_update_entity(entry.entity_id, area_id=area_id, labels=labels or set())
     attributes = {"friendly_name": name}
     if device_class:
         attributes["device_class"] = device_class
@@ -130,11 +112,10 @@ async def arm_panel(hass):
     await hass.async_block_till_done()
 
 
-async def test_an_open_door_in_the_alarms_area_blocks_arming(hass, aioclient_mock):
+async def test_a_picked_open_sensor_blocks_arming_by_name(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    area = ar.async_get(hass).async_get_or_create("Main Floor")
-    place_alarm(hass, entry, area_id=area.id)
-    sensor(hass, "front_door", "Front Door", "on", "door", area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "on", "door")
+    pick_sensors(hass, entry, ["binary_sensor.front_door"])
 
     with pytest.raises(ServiceValidationError, match="Front Door is not clear"):
         await arm_panel(hass)
@@ -142,11 +123,10 @@ async def test_an_open_door_in_the_alarms_area_blocks_arming(hass, aioclient_moc
     assert hass.states.get(ENTITY).state == "disarmed"
 
 
-async def test_a_clear_area_lets_the_arm_through(hass, aioclient_mock):
+async def test_a_clear_pick_lets_the_arm_through(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    area = ar.async_get(hass).async_get_or_create("Main Floor")
-    place_alarm(hass, entry, area_id=area.id)
-    sensor(hass, "front_door", "Front Door", "off", "door", area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "off", "door")
+    pick_sensors(hass, entry, ["binary_sensor.front_door"])
     aioclient_mock.get(ARM, json={"error": False, "traceId": "t1", "data": {}})
 
     await arm_panel(hass)
@@ -154,7 +134,7 @@ async def test_a_clear_area_lets_the_arm_through(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "armed_home"
 
 
-async def test_an_unplaced_alarm_arms_unconditionally(hass, aioclient_mock):
+async def test_nothing_picked_arms_unconditionally(hass, aioclient_mock):
     await setup_entry(hass, aioclient_mock)
     sensor(hass, "front_door", "Front Door", "on", "door")
     aioclient_mock.get(ARM, json={"error": False, "traceId": "t1", "data": {}})
@@ -164,12 +144,17 @@ async def test_an_unplaced_alarm_arms_unconditionally(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "armed_home"
 
 
-async def test_motion_in_the_area_does_not_block(hass, aioclient_mock):
+async def test_only_picked_sensors_count_never_the_alarms_area_or_labels(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    area = ar.async_get(hass).async_get_or_create("Main Floor")
-    place_alarm(hass, entry, area_id=area.id)
-    sensor(hass, "hall_motion", "Hall Motion", "on", "motion", area_id=area.id)
-    sensor(hass, "front_door", "Front Door", "off", "door", area_id=area.id)
+    device = alarm_device(hass, entry)
+    dr.async_get(hass).async_update_device(device.id, area_id="default", labels={"perimeter"})
+    er.async_get(hass).async_update_entity(
+        sensor(hass, "hub_tamper", "Hub Tamper", "on", "tamper"),
+        area_id="default",
+        labels={"perimeter"},
+    )
+    sensor(hass, "front_door", "Front Door", "off", "door")
+    pick_sensors(hass, entry, ["binary_sensor.front_door"])
     aioclient_mock.get(ARM, json={"error": False, "traceId": "t1", "data": {}})
 
     await arm_panel(hass)
@@ -177,60 +162,52 @@ async def test_motion_in_the_area_does_not_block(hass, aioclient_mock):
     assert hass.states.get(ENTITY).state == "armed_home"
 
 
-async def test_a_label_resolves_to_its_diagnostic_tampers(hass, aioclient_mock):
+async def test_picked_sensors_count_regardless_of_class(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    label = lr.async_get(hass).async_create("Perimeter")
-    place_alarm(hass, entry, labels={label.label_id})
-    sensor(
-        hass,
-        "study_tamper",
-        "Study Tamper",
-        "on",
-        "tamper",
-        labels={label.label_id},
-        category=EntityCategory.DIAGNOSTIC,
-    )
+    sensor(hass, "hall_motion", "Hall Motion", "on", "motion")
+    pick_sensors(hass, entry, ["binary_sensor.hall_motion"])
 
-    with pytest.raises(ServiceValidationError, match="Study Tamper is not clear"):
+    with pytest.raises(ServiceValidationError, match="Hall Motion is not clear"):
         await arm_panel(hass)
 
 
-async def test_a_dead_sensor_blocks_arming(hass, aioclient_mock):
+async def test_a_dead_pick_blocks_arming(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    label = lr.async_get(hass).async_create("Perimeter")
-    place_alarm(hass, entry, labels={label.label_id})
-    sensor(hass, "garage", "Garage Door", "unavailable", "garage_door", labels={label.label_id})
+    sensor(hass, "garage", "Garage Door", "unavailable", "garage_door")
+    pick_sensors(hass, entry, ["binary_sensor.garage"])
 
     with pytest.raises(ServiceValidationError, match="Garage Door is unavailable"):
         await arm_panel(hass)
 
 
-async def test_a_labelled_group_is_walked_to_the_member_at_fault(hass, aioclient_mock):
+async def test_a_picked_group_is_walked_to_the_member_at_fault(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    label = lr.async_get(hass).async_create("Perimeter")
-    place_alarm(hass, entry, labels={label.label_id})
-    registry = er.async_get(hass)
-    group = registry.async_get_or_create(
-        "binary_sensor", "group", "doors", suggested_object_id="doors"
-    )
-    registry.async_update_entity(group.entity_id, labels={label.label_id})
     hass.states.async_set(
-        group.entity_id,
+        "binary_sensor.doors",
         "off",
         {"friendly_name": "Doors", "entity_id": ["binary_sensor.d1", "binary_sensor.d2"]},
     )
     hass.states.async_set("binary_sensor.d1", "off", {"friendly_name": "Main Door"})
     hass.states.async_set("binary_sensor.d2", "unknown", {"friendly_name": "Rear Door"})
+    pick_sensors(hass, entry, ["binary_sensor.doors"])
 
     with pytest.raises(ServiceValidationError, match="Rear Door is unknown"):
         await arm_panel(hass)
 
 
+async def test_a_pick_that_vanished_blocks(hass, aioclient_mock):
+    entry = await setup_entry(hass, aioclient_mock)
+    pick_sensors(hass, entry, ["binary_sensor.gone"])
+
+    with pytest.raises(ServiceValidationError, match="binary_sensor.gone is missing"):
+        await arm_panel(hass)
+
+
 async def test_the_custom_arm_service_is_gated_too(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    area = ar.async_get(hass).async_get_or_create("Main Floor")
-    device = place_alarm(hass, entry, area_id=area.id)
-    sensor(hass, "front_door", "Front Door", "on", "door", area_id=area.id)
+    device = alarm_device(hass, entry)
+    sensor(hass, "front_door", "Front Door", "on", "door")
+    pick_sensors(hass, entry, ["binary_sensor.front_door"])
 
     with pytest.raises(ServiceValidationError, match="Front Door is not clear"):
         await hass.services.async_call(
@@ -243,9 +220,8 @@ async def test_the_custom_arm_service_is_gated_too(hass, aioclient_mock):
 
 async def test_disarm_is_never_gated(hass, aioclient_mock):
     entry = await setup_entry(hass, aioclient_mock)
-    area = ar.async_get(hass).async_get_or_create("Main Floor")
-    place_alarm(hass, entry, area_id=area.id)
-    sensor(hass, "front_door", "Front Door", "on", "door", area_id=area.id)
+    sensor(hass, "front_door", "Front Door", "on", "door")
+    pick_sensors(hass, entry, ["binary_sensor.front_door"])
     aioclient_mock.get(DISARM, json={"error": False, "traceId": "t1", "data": {}})
 
     await hass.services.async_call(
@@ -257,46 +233,6 @@ async def test_disarm_is_never_gated(hass, aioclient_mock):
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY).state == "disarmed"
-
-
-async def test_picked_sensors_gate_arming(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-    sensor(hass, "front_door", "Front Door", "on", "door")
-    pick_sensors(hass, entry, ["binary_sensor.front_door"])
-
-    with pytest.raises(ServiceValidationError, match="Front Door is not clear"):
-        await arm_panel(hass)
-
-
-async def test_picked_sensors_count_regardless_of_class(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-    sensor(hass, "hall_motion", "Hall Motion", "on", "motion")
-    pick_sensors(hass, entry, ["binary_sensor.hall_motion"])
-
-    with pytest.raises(ServiceValidationError, match="Hall Motion is not clear"):
-        await arm_panel(hass)
-
-
-async def test_a_picked_sensor_that_vanished_blocks(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-    pick_sensors(hass, entry, ["binary_sensor.gone"])
-
-    with pytest.raises(ServiceValidationError, match="binary_sensor.gone is missing"):
-        await arm_panel(hass)
-
-
-async def test_picked_sensors_and_area_combine(hass, aioclient_mock):
-    entry = await setup_entry(hass, aioclient_mock)
-    area = ar.async_get(hass).async_get_or_create("Garage")
-    place_alarm(hass, entry, area_id=area.id)
-    sensor(hass, "garage_door", "Garage Door", "on", "garage_door", area_id=area.id)
-    sensor(hass, "side_window", "Side Window", "unavailable", "window")
-    pick_sensors(hass, entry, ["binary_sensor.side_window"])
-
-    with pytest.raises(ServiceValidationError) as raised:
-        await arm_panel(hass)
-    assert "Side Window is unavailable" in str(raised.value)
-    assert "Garage Door is not clear" in str(raised.value)
 
 
 async def test_the_options_flow_stores_the_picks_per_alarm(hass, aioclient_mock):
