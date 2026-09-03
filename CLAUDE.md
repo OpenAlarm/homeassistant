@@ -41,7 +41,11 @@ tests/                   pytest, via pytest-homeassistant-custom-component
 
 - **Versioning is semver in `manifest.json`, bumped on every user-visible
   change**, because installs track the default branch until releases exist and
-  the manifest version is the only way to know what is running.
+  the manifest version is the only way to know what is running. **Minor** for a
+  new capability a user can see or configure (a new action, entity, option, or
+  a behaviour they could not get before); **patch** for anything that changes how
+  the same capability behaves - a fix, a cadence, a threshold, a guard. The
+  state-poll slowdown was a patch (1.8.2), not a minor: nothing new to use.
 - **Action ids are noun-first** (`alarm_arm`, `panic_clear`) so they group;
   **labels are verb-first sentence case** ("Arm alarm") because that is Home
   Assistant core's register. Both were checked against core, not assumed.
