@@ -64,6 +64,7 @@ class OpenAlarmRealtime:
         api_key: str,
         realtime: dict[str, Any],
         on_change: Callable[[], Awaitable[None]],
+        on_connected: Callable[[bool], None] | None = None,
     ) -> None:
         self._session = session
         self._api_key = api_key
@@ -71,7 +72,12 @@ class OpenAlarmRealtime:
         self._ws_host = realtime["realtimeHost"]
         self._channel = realtime["channel"]
         self._on_change = on_change
+        self._on_connected = on_connected
         self._task: asyncio.Task[None] | None = None
+
+    def _set_connected(self, connected: bool) -> None:
+        if self._on_connected is not None:
+            self._on_connected(connected)
 
     def start(self) -> None:
         if self._task is None or self._task.done():
@@ -85,6 +91,7 @@ class OpenAlarmRealtime:
             except asyncio.CancelledError:
                 pass
             self._task = None
+        self._set_connected(False)
 
     async def _run(self) -> None:
         backoff = BACKOFF_MIN
@@ -98,6 +105,7 @@ class OpenAlarmRealtime:
                 _LOGGER.debug("realtime connection ended: %s", err)
             except Exception:
                 _LOGGER.exception("unexpected realtime failure")
+            self._set_connected(False)
             delay = backoff + random.uniform(0, backoff / 2)
             backoff = min(backoff * 2, BACKOFF_MAX)
             await asyncio.sleep(delay)
@@ -128,5 +136,7 @@ class OpenAlarmRealtime:
                     )
                     continue
                 action = handle_frame(frame)
+                if action == "subscribed":
+                    self._set_connected(True)
                 if action in ("subscribed", "refresh"):
                     await self._on_change()

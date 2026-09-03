@@ -104,6 +104,7 @@ def _async_start_realtime(hass: HomeAssistant, entry: OpenAlarmConfigEntry) -> N
             entry.data[CONF_API_KEY],
             recipe,
             data.state.async_request_refresh,
+            data.state.set_realtime_connected,
         )
     except KeyError:
         _LOGGER.warning("realtime recipe is incomplete; staying on polling")

@@ -30,4 +30,5 @@ KIND_PANIC = "panic"
 
 UPDATE_INTERVAL = timedelta(hours=6)
 STATE_UPDATE_INTERVAL = timedelta(seconds=60)
+STATE_UPDATE_INTERVAL_REALTIME = timedelta(minutes=5)
 REQUEST_TIMEOUT = 15

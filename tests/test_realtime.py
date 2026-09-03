@@ -129,3 +129,68 @@ async def test_setup_with_a_recipe_starts_the_listener(hass, aioclient_mock):
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert listener._task is None
+
+
+async def test_state_polls_slowly_only_while_the_socket_is_up(hass, aioclient_mock):
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.openalarm.const import (
+        CONF_API_KEY,
+        CONF_LOCATION_ID,
+        CONF_LOCATION_NAME,
+        DEFAULT_BASE_URL,
+        DOMAIN,
+        STATE_UPDATE_INTERVAL,
+        STATE_UPDATE_INTERVAL_REALTIME,
+    )
+
+    body = {
+        "error": False,
+        "data": {
+            "version": "1.0.0",
+            "realtime": {
+                "httpHost": "example.appsync-api.ca-west-1.amazonaws.com",
+                "realtimeHost": "example.appsync-realtime-api.ca-west-1.amazonaws.com",
+                "channel": "/account/acc1",
+            },
+            "locations": [
+                {"id": "loc-home", "name": "Home", "alarms": [], "panicButtons": []}
+            ],
+        },
+    }
+    aioclient_mock.get(f"{DEFAULT_BASE_URL}/v1/integration/describe", json=body)
+    aioclient_mock.get(
+        f"{DEFAULT_BASE_URL}/v1/integration/state",
+        json={"error": False, "data": {"version": "1.0.0", "alarms": []}},
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="loc-home",
+        title="Home",
+        data={
+            CONF_API_KEY: "oa_x",
+            CONF_LOCATION_ID: "loc-home",
+            CONF_LOCATION_NAME: "Home",
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = entry.runtime_data.state
+    listener = entry.runtime_data.realtime
+    assert listener._on_connected == state.set_realtime_connected
+    assert state.update_interval == STATE_UPDATE_INTERVAL
+
+    listener._set_connected(True)
+    assert state.update_interval == STATE_UPDATE_INTERVAL_REALTIME
+
+    polls_before = len([c for c in aioclient_mock.mock_calls if "/state" in str(c[1])])
+    listener._set_connected(False)
+    await hass.async_block_till_done()
+    assert state.update_interval == STATE_UPDATE_INTERVAL
+    polls_after = len([c for c in aioclient_mock.mock_calls if "/state" in str(c[1])])
+    assert polls_after == polls_before + 1
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()

@@ -6,12 +6,17 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import InvalidAuth, OpenAlarmClient, OpenAlarmError
-from .const import DOMAIN, STATE_UPDATE_INTERVAL, UPDATE_INTERVAL
+from .const import (
+    DOMAIN,
+    STATE_UPDATE_INTERVAL,
+    STATE_UPDATE_INTERVAL_REALTIME,
+    UPDATE_INTERVAL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,6 +97,16 @@ class OpenAlarmStateCoordinator(DataUpdateCoordinator[dict[str, str]]):
             config_entry=entry,
         )
         self.client = client
+
+    @callback
+    def set_realtime_connected(self, connected: bool) -> None:
+        """Poll slowly while the push channel is up, at the full cadence when it is not."""
+        interval = STATE_UPDATE_INTERVAL_REALTIME if connected else STATE_UPDATE_INTERVAL
+        if self.update_interval == interval:
+            return
+        self.update_interval = interval
+        if not connected:
+            self.hass.async_create_task(self.async_request_refresh())
 
     async def _async_update_data(self) -> dict[str, dict[str, str | None]]:
         try:
