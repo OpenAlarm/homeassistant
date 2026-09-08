@@ -39,9 +39,16 @@ tests/                   pytest, via pytest-homeassistant-custom-component
 
 ## Conventions
 
+- **Every version bump ships as a GitHub release, in the same change.**
+  `hacs.json` sets `hide_default_branch: true`, so HACS never serves `main` -
+  it serves the latest tag and nothing else. A `manifest.json` bump without a
+  matching `gh release create vX.Y.Z --target main` delivers nothing to anyone;
+  1.9.0 was bumped and never tagged on 2026-09-08 and no install could have
+  had it. Release notes are one prose paragraph in the user's terms, like
+  v1.8.2 and v1.10.0.
 - **Versioning is semver in `manifest.json`, bumped on every user-visible
-  change**, because installs track the default branch until releases exist and
-  the manifest version is the only way to know what is running. **Minor** for a
+  change**, because the manifest version is the only way to know what is
+  running. **Minor** for a
   new capability a user can see or configure (a new action, entity, option, or
   a behaviour they could not get before); **patch** for anything that changes how
   the same capability behaves - a fix, a cadence, a threshold, a guard. The
