@@ -30,7 +30,6 @@ BODY = {
                             {"id": "home", "name": "Home"},
                             {"id": "away", "name": "Away"},
                             {"id": "night", "name": "Night"},
-                            {"id": "k7x9m2qp4rtnb3vwj5h8c6d0efg1tvwz", "name": "Test"},
                         ],
                     }
                 ],
@@ -42,8 +41,8 @@ BODY = {
 STATE_BODY = {"error": False, "data": {"version": "1.0.0", "alarms": [{"id": "a1", "state": "disarmed"}]}}
 
 
-async def test_custom_modes_reach_the_dropdown_by_name(hass, aioclient_mock):
-    """The arm dropdown lists live modes as value/label pairs, custom included.
+async def test_live_modes_reach_the_dropdown_by_name(hass, aioclient_mock):
+    """The arm dropdown lists the alarm's live modes as value/label pairs.
 
     Regression: during setup the entry is SETUP_IN_PROGRESS, not LOADED, and
     the first version of the guard skipped it - so the dropdown stayed static
@@ -66,6 +65,9 @@ async def test_custom_modes_reach_the_dropdown_by_name(hass, aioclient_mock):
     for service in ("alarm_arm", "alarm_trigger"):
         desc = (descs.get(DOMAIN) or {}).get(service) or {}
         options = desc["fields"]["mode"]["selector"]["select"]["options"]
-        assert {"value": "k7x9m2qp4rtnb3vwj5h8c6d0efg1tvwz", "label": "Test"} in options
-        assert options[0] == {"value": "home", "label": "Home"}
-        assert desc["fields"]["mode"]["selector"]["select"]["custom_value"] is True
+        assert options == [
+            {"value": "home", "label": "Home"},
+            {"value": "away", "label": "Away"},
+            {"value": "night", "label": "Night"},
+        ]
+        assert desc["fields"]["mode"]["selector"]["select"]["custom_value"] is False

@@ -14,7 +14,6 @@ alarm_arm:
       selector:
         select:
           mode: dropdown
-          custom_value: true
           translation_key: mode
           options:
             - home
@@ -48,7 +47,6 @@ alarm_trigger:
       selector:
         select:
           mode: dropdown
-          custom_value: true
           translation_key: mode
           options:
             - home

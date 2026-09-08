@@ -159,9 +159,7 @@ async def test_the_panel_knows_its_mode(hass, aioclient_mock):
     """Automations branch on the mode directly, with no from_state gymnastics.
 
     The state feed carries the live mode: the armed mode while armed, the
-    incident's mode while triggered, nothing while disarmed. Custom modes
-    keep their real identity here even though the panel state collapses
-    them to armed_custom_bypass.
+    incident's mode while triggered, nothing while disarmed.
     """
     entry = await setup_entry(hass, aioclient_mock)
     state = hass.states.get(ENTITY)
@@ -181,14 +179,14 @@ async def test_the_panel_knows_its_mode(hass, aioclient_mock):
 
     aioclient_mock.clear_requests()
     aioclient_mock.get(DESCRIBE, json=BODY)
-    aioclient_mock.get(STATE, json=state_body("armed_custom", mode="vac123", mode_name="Vacation"))
+    aioclient_mock.get(STATE, json=state_body("armed_night", mode="night", mode_name="Night"))
     await entry.runtime_data.state.async_refresh()
     await hass.async_block_till_done()
 
     state = hass.states.get(ENTITY)
-    assert state.state == "armed_custom_bypass"
-    assert state.attributes["mode"] == "vac123"
-    assert state.attributes["mode_name"] == "Vacation"
+    assert state.state == "armed_night"
+    assert state.attributes["mode"] == "night"
+    assert state.attributes["mode_name"] == "Night"
 
 
 async def test_a_feed_without_modes_still_works(hass, aioclient_mock):

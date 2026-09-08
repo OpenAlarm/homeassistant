@@ -38,7 +38,6 @@ SERVER_TO_HA = {
     "armed_home": AlarmControlPanelState.ARMED_HOME,
     "armed_away": AlarmControlPanelState.ARMED_AWAY,
     "armed_night": AlarmControlPanelState.ARMED_NIGHT,
-    "armed_custom": AlarmControlPanelState.ARMED_CUSTOM_BYPASS,
     "triggered": AlarmControlPanelState.TRIGGERED,
 }
 
@@ -138,12 +137,7 @@ class OpenAlarmPanel(
 
     @property
     def supported_features(self) -> AlarmControlPanelEntityFeature:
-        """Advertise only the seeded modes this alarm actually has.
-
-        Custom modes have no panel affordance in Home Assistant; they stay
-        reachable through the openalarm.alarm_arm action, and show here as
-        armed custom when the server reports one.
-        """
+        """Advertise only the modes this alarm actually has."""
         features = AlarmControlPanelEntityFeature.TRIGGER
         for mode in self._data.inventory.modes_for(self.alarm_id):
             features |= MODE_FEATURES.get(
