@@ -34,6 +34,7 @@ triggers:
       - armed_home
       - armed_away
       - armed_night
+      - armed_vacation
       - disarmed
 
 actions:
