@@ -58,6 +58,21 @@ tests/                   pytest, via pytest-homeassistant-custom-component
   checked against `home-assistant/core` at the pinned floor were not.
 - Ids from the API are opaque 32-character strings. Never parse them, never
   display them where a configured name exists.
+- **A custom mode reaches HomeKit as nothing at all, and that is upstream, not
+  ours.** We map `armed_custom` to `ARMED_CUSTOM_BYPASS`
+  (`alarm_control_panel.py`), which is the only state HA has for it, and keep
+  the real identity in the `mode` / `mode_name` attributes. But core's
+  `homekit/type_security_systems.py` has no entry for `armed_custom_bypass` in
+  `HASS_TO_HOMEKIT_CURRENT`, and the update path does
+  `HASS_TO_HOMEKIT_CURRENT.get(state)` then skips on `None`. So the bridge does
+  not write a wrong value, it **writes nothing** - HomeKit keeps showing the
+  previous state. Arming a custom mode from disarmed leaves HomeKit reading
+  Off; arming it from Away leaves it reading Away, which is the worse case.
+  Verified against core `dev` on 2026-09-08. **Do not "fix" this by mapping
+  custom modes onto `armed_away`**: HomeKit's `SecuritySystemCurrentState` has
+  only stay / away / night / disarmed / triggered, so any mapping is a lie to
+  every HA automation reading the state, and it would cost the mode identity
+  that the attributes exist to carry. It is documented as a limitation instead.
 
 ## Commands
 
