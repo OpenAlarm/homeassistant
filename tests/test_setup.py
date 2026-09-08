@@ -30,6 +30,7 @@ BODY = {
                             {"id": "home", "name": "Home"},
                             {"id": "away", "name": "Away"},
                             {"id": "night", "name": "Night"},
+                            {"id": "vacation", "name": "Vacation"},
                         ],
                     }
                 ],
@@ -69,5 +70,6 @@ async def test_live_modes_reach_the_dropdown_by_name(hass, aioclient_mock):
             {"value": "home", "label": "Home"},
             {"value": "away", "label": "Away"},
             {"value": "night", "label": "Night"},
+            {"value": "vacation", "label": "Vacation"},
         ]
         assert desc["fields"]["mode"]["selector"]["select"]["custom_value"] is False

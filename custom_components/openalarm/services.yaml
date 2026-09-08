@@ -19,6 +19,7 @@ alarm_arm:
             - home
             - away
             - night
+            - vacation
 
 alarm_disarm:
   fields:
@@ -52,6 +53,7 @@ alarm_trigger:
             - home
             - away
             - night
+            - vacation
 
 alarm_clear:
   fields:

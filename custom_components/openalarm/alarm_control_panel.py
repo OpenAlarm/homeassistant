@@ -31,6 +31,7 @@ MODE_FEATURES = {
     "home": AlarmControlPanelEntityFeature.ARM_HOME,
     "away": AlarmControlPanelEntityFeature.ARM_AWAY,
     "night": AlarmControlPanelEntityFeature.ARM_NIGHT,
+    "vacation": AlarmControlPanelEntityFeature.ARM_VACATION,
 }
 
 SERVER_TO_HA = {
@@ -38,6 +39,7 @@ SERVER_TO_HA = {
     "armed_home": AlarmControlPanelState.ARMED_HOME,
     "armed_away": AlarmControlPanelState.ARMED_AWAY,
     "armed_night": AlarmControlPanelState.ARMED_NIGHT,
+    "armed_vacation": AlarmControlPanelState.ARMED_VACATION,
     "triggered": AlarmControlPanelState.TRIGGERED,
 }
 

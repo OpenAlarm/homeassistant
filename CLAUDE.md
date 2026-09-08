@@ -58,18 +58,24 @@ tests/                   pytest, via pytest-homeassistant-custom-component
   checked against `home-assistant/core` at the pinned floor were not.
 - Ids from the API are opaque 32-character strings. Never parse them, never
   display them where a configured name exists.
-- **The mode vocabulary is closed: `home`, `away`, `night`** (2026-09-08, see
-  `reference/architecture/alarm-modes.md`). `SERVER_TO_HA` maps exactly those,
-  `services.yaml` no longer sets `custom_value` on the mode selector, and there
-  is no `armed_custom`. Part of the reason it went: `armed_custom_bypass` is
-  **not** in core's `homekit/type_security_systems.py` `HASS_TO_HOMEKIT_CURRENT`,
-  and the update path does `.get(state)` then skips on `None`, so the bridge
-  wrote **nothing** and HomeKit kept showing its previous state - Off if you
-  armed from disarmed. **If a fourth mode is ever added, do not map it onto an
-  existing HomeKit state to make it visible**: HomeKit has only stay / away /
-  night / disarmed / triggered, so any such mapping lies to every HA automation
-  reading the state. `armed_vacation` is the one HA state that already degrades
-  correctly, to Away - it was considered and deferred, not rejected.
+- **The mode vocabulary is closed: `home`, `away`, `night`, `vacation`**
+  (2026-09-08, see `reference/architecture/alarm-modes.md`). It is declared once
+  in `const.py` as `MODES`; `SERVER_TO_HA`, `MODE_FEATURES` and the
+  `services.yaml` selectors all follow it, and the dropdown rebuild filters to
+  it so a stale record cannot offer an unarmable option. User-named modes were
+  removed - there is no `armed_custom`, and the selectors do not set
+  `custom_value`.
+- **Vacation is visible in HA and shows as Away in HomeKit, by design.**
+  `armed_vacation` is a first-class HA state with its own service and feature
+  flag, and core's `homekit/type_security_systems.py` maps it to
+  `HK_ALARM_AWAY_ARMED` on the way out; `HK_TO_SERVICE` has no way back, so a
+  HomeKit user cannot select it. That is the correct degradation and the reason
+  Vacation was acceptable where custom modes were not: `armed_custom_bypass` is
+  in **neither** map, so the bridge wrote nothing and the tile went stale.
+  **If a fifth mode is ever added, do not map it onto an existing HomeKit state
+  to force visibility** - HomeKit has only stay / away / night / disarmed /
+  triggered, and any invented mapping lies to every automation reading the
+  panel state.
 
 ## Commands
 

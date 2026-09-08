@@ -31,6 +31,7 @@ from .const import (
     DEFAULT_BASE_URL,
     DOMAIN,
     KIND_ALARM,
+    MODES,
     KIND_PANIC,
     MANUFACTURER,
     SERVICE_ARM,
@@ -161,12 +162,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) -
 async def _async_refresh_mode_options(hass: HomeAssistant) -> None:
     """Rebuild the arm and trigger mode dropdowns from live inventory.
 
-    Modes are shown by their configured name and submitted by id, merged
-    across every loaded location. Runs after each inventory refresh, so a
-    mode added or renamed in the console appears here on the same cadence
-    as everything else - the six-hour poll, an entry reload, or setup.
+    The vocabulary is fixed, so this exists for the names: a mode renamed in
+    the console appears here on the same cadence as everything else - the
+    six-hour poll, an entry reload, or setup. Ids outside MODES are ignored,
+    so a stale record cannot put an unarmable option in the dropdown, and one
+    id named differently by two alarms shows both.
     """
-    labels: dict[str, dict[str, set[str]]] = {}
+    labels: dict[str, set[str]] = {}
     ready = (ConfigEntryState.LOADED, ConfigEntryState.SETUP_IN_PROGRESS)
     for entry in hass.config_entries.async_entries(DOMAIN):
         if entry.state not in ready:
@@ -177,27 +179,14 @@ async def _async_refresh_mode_options(hass: HomeAssistant) -> None:
         for alarm in data.inventory.alarms():
             for mode in alarm.get("modes") or []:
                 mode_id = mode.get("id")
-                if not mode_id:
-                    continue
-                record = labels.setdefault(mode_id, {"names": set(), "alarms": set()})
-                record["names"].add(mode.get("name") or mode_id)
-                record["alarms"].add(alarm.get("name") or "")
+                if mode_id in MODES:
+                    labels.setdefault(mode_id, set()).add(mode.get("name") or mode_id)
 
-    seeded = ("home", "away", "night")
     options = [
-        {
-            "value": mode_id,
-            "label": " / ".join(sorted(record["names"])),
-        }
-        for mode_id, record in labels.items()
+        {"value": mode_id, "label": " / ".join(sorted(labels[mode_id]))}
+        for mode_id in MODES
+        if mode_id in labels
     ]
-    options.sort(
-        key=lambda option: (
-            option["value"] not in seeded,
-            seeded.index(option["value"]) if option["value"] in seeded else 0,
-            option["label"].lower(),
-        )
-    )
     if not options:
         return
 

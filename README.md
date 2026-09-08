@@ -23,9 +23,9 @@ Six actions:
 | `openalarm.panic_trigger` | Triggers a panic button |
 | `openalarm.panic_clear` | Clears a panic button's open incident |
 
-Your modes come from your account - Home, Away and Night - and show up in the arm and trigger dropdowns by their configured names, not their ids. Rename a mode in the OpenAlarm console and the dropdown follows on the next refresh or reload, with no reinstall.
+Your modes come from your account - Home, Away, Night and Vacation - and show up in the arm and trigger dropdowns by their configured names, not their ids. Rename a mode in the OpenAlarm console and the dropdown follows on the next refresh or reload, with no reinstall.
 
-Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is the service's real state, pushed as it changes, and an open incident shows as triggered until it clears. (The console never arms anything, by design: it reads state, and arming arrives only through the API.) Commands reflect immediately, and the panel's own buttons cover Home, Away and Night.
+Each alarm also carries an **alarm control panel entity**, so dashboards and panel cards can arm, disarm and trigger it like any other alarm. Its state is the service's real state, pushed as it changes, and an open incident shows as triggered until it clears. (The console never arms anything, by design: it reads state, and arming arrives only through the API.) Commands reflect immediately, and the panel's own buttons cover Home, Away, Night and Vacation. Vacation is a real Home Assistant state (`armed_vacation`); the HomeKit bridge has no vacation of its own and shows it as Away, which is what it is - an extended away.
 
 The panel carries two attributes, `mode` and `mode_name`: the armed mode while armed, the incident's mode while triggered, empty while disarmed. Automations branch on them with a plain state condition on the attribute - Home Assistant's own `is_armed_*` conditions read the current state, which is `triggered` during an incident, so they cannot tell Away from Home once the alarm has fired.
 

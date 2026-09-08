@@ -18,6 +18,8 @@ CONF_SENSORS = "sensors"
 
 ATTR_MODE = "mode"
 
+MODES = ("home", "away", "night", "vacation")
+
 SERVICE_ARM = "alarm_arm"
 SERVICE_DISARM = "alarm_disarm"
 SERVICE_TRIGGER = "alarm_trigger"
