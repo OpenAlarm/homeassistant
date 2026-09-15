@@ -191,6 +191,9 @@ class OpenAlarmPanel(
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         await self._act("arm", "night", AlarmControlPanelState.ARMED_NIGHT)
 
+    async def async_alarm_arm_vacation(self, code: str | None = None) -> None:
+        await self._act("arm", "vacation", AlarmControlPanelState.ARMED_VACATION)
+
     async def async_alarm_disarm(self, code: str | None = None) -> None:
         await self._act("disarm", None, AlarmControlPanelState.DISARMED)
 
