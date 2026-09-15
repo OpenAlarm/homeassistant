@@ -28,15 +28,15 @@ def async_check_ready(
     group only goes unavailable when every member is, which would let one dead
     sensor hide. A pick that no longer exists blocks too.
     """
-    picked = list((entry.options.get(CONF_READINESS) or {}).get(alarm_id) or [])
-    problems = _problems(hass, sorted(picked), set())
+    picked = sorted((entry.options.get(CONF_READINESS) or {}).get(alarm_id) or [])
+    problems = _problems(hass, picked, set())
     if problems:
-        raise ServiceValidationError(
-            f"Cannot arm {alarm_name}: " + "; ".join(problems)
-        )
+        raise ServiceValidationError(f"Cannot arm {alarm_name}: " + "; ".join(problems))
 
 
-def _problems(hass: HomeAssistant, entity_ids: list[str], visited: set[str]) -> list[str]:
+def _problems(
+    hass: HomeAssistant, entity_ids: list[str], visited: set[str]
+) -> list[str]:
     found: list[str] = []
     for entity_id in entity_ids:
         if entity_id in visited:

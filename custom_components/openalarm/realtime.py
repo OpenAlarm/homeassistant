@@ -114,15 +114,20 @@ class OpenAlarmRealtime:
         url = f"wss://{self._ws_host}/event/realtime"
         protocols = (auth_subprotocol(self._http_host, self._api_key), SUBPROTOCOL)
         timeout = DEFAULT_TIMEOUT
-        async with self._session.ws_connect(url, protocols=protocols, heartbeat=None) as ws:
+        async with self._session.ws_connect(
+            url, protocols=protocols, heartbeat=None
+        ) as ws:
             await ws.send_json({"type": "connection_init"})
             while True:
                 msg = await ws.receive(timeout=timeout + RECEIVE_SLACK)
                 if msg.type != aiohttp.WSMsgType.TEXT:
                     raise RealtimeProtocolError(f"socket closed: {msg.type}")
                 frame = json.loads(msg.data)
-                if frame.get("type") == "connection_ack":
-                    timeout = (frame.get("connectionTimeoutMs") or 300_000) / 1000
+                action = handle_frame(frame)
+                if action == "ack":
+                    timeout = (
+                        frame.get("connectionTimeoutMs") or DEFAULT_TIMEOUT * 1000
+                    ) / 1000
                     await ws.send_json(
                         {
                             "type": "subscribe",
@@ -135,7 +140,6 @@ class OpenAlarmRealtime:
                         }
                     )
                     continue
-                action = handle_frame(frame)
                 if action == "subscribed":
                     self._set_connected(True)
                 if action in ("subscribed", "refresh"):

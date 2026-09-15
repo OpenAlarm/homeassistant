@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import OpenAlarmConfigEntry, OpenAlarmData
-from .api import OpenAlarmError
+from .api import OpenAlarmError, trace_fields
 from .const import DOMAIN, KIND_ALARM
 from .coordinator import OpenAlarmStateCoordinator
 from .readiness import async_check_ready
@@ -111,6 +111,16 @@ class OpenAlarmPanel(
                 self._pending = None
         super()._handle_coordinator_update()
 
+    def _alarm(self) -> dict[str, Any] | None:
+        return next(
+            (
+                alarm
+                for alarm in self._data.inventory.alarms()
+                if alarm.get("id") == self.alarm_id
+            ),
+            None,
+        )
+
     def _server_entry(self) -> dict[str, str | None]:
         return (self.coordinator.data or {}).get(self.alarm_id) or {}
 
@@ -126,10 +136,7 @@ class OpenAlarmPanel(
     @property
     def available(self) -> bool:
         """Unavailable once the alarm leaves the key's inventory."""
-        return super().available and any(
-            alarm.get("id") == self.alarm_id
-            for alarm in self._data.inventory.alarms()
-        )
+        return super().available and self._alarm() is not None
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
@@ -150,8 +157,10 @@ class OpenAlarmPanel(
     async def _act(
         self, action: str, mode: str | None, state: AlarmControlPanelState
     ) -> None:
+        if action == "arm":
+            self._assert_ready()
         try:
-            body: dict[str, Any] = await self._data.client.act(
+            body = await self._data.client.act(
                 KIND_ALARM, self.alarm_id, action, mode
             )
         except OpenAlarmError as err:
@@ -160,8 +169,7 @@ class OpenAlarmPanel(
             "panel %s on %s traceId=%s environment=%s",
             action,
             self.alarm_id,
-            body.get("traceId"),
-            (body.get("data") or {}).get("environment"),
+            *trace_fields(body),
         )
         self._pending = state
         self._pending_until = time.monotonic() + PENDING_WINDOW
@@ -169,28 +177,18 @@ class OpenAlarmPanel(
         await self.coordinator.async_request_refresh()
 
     def _assert_ready(self) -> None:
-        name = next(
-            (
-                alarm.get("name")
-                for alarm in self._data.inventory.alarms()
-                if alarm.get("id") == self.alarm_id
-            ),
-            None,
-        )
+        name = (self._alarm() or {}).get("name") or self.alarm_id
         async_check_ready(
-            self.hass, self.coordinator.config_entry, self.alarm_id, name or self.alarm_id
+            self.hass, self.coordinator.config_entry, self.alarm_id, name
         )
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
-        self._assert_ready()
         await self._act("arm", "home", AlarmControlPanelState.ARMED_HOME)
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        self._assert_ready()
         await self._act("arm", "away", AlarmControlPanelState.ARMED_AWAY)
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
-        self._assert_ready()
         await self._act("arm", "night", AlarmControlPanelState.ARMED_NIGHT)
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:

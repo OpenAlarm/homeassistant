@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -19,6 +20,19 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+type AlarmStates = dict[str, dict[str, str | None]]
+
+
+async def _fetch(
+    call: Callable[[], Awaitable[dict[str, Any]]],
+) -> dict[str, Any]:
+    try:
+        return await call()
+    except InvalidAuth as err:
+        raise ConfigEntryAuthFailed(str(err)) from err
+    except OpenAlarmError as err:
+        raise UpdateFailed(str(err)) from err
 
 
 class OpenAlarmCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -43,14 +57,10 @@ class OpenAlarmCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.realtime: dict[str, Any] | None = None
 
     async def _async_update_data(self) -> dict[str, Any]:
-        try:
-            data = await self.client.describe()
-        except InvalidAuth as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
-        except OpenAlarmError as err:
-            raise UpdateFailed(str(err)) from err
+        data = await _fetch(self.client.describe)
 
-        self.realtime = data.get("realtime") if isinstance(data.get("realtime"), dict) else None
+        realtime = data.get("realtime")
+        self.realtime = realtime if isinstance(realtime, dict) else None
 
         for location in data.get("locations") or []:
             if location.get("id") == self.location_id:
@@ -83,7 +93,7 @@ class OpenAlarmCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return []
 
 
-class OpenAlarmStateCoordinator(DataUpdateCoordinator[dict[str, str]]):
+class OpenAlarmStateCoordinator(DataUpdateCoordinator[AlarmStates]):
     """Polls alarm state at a cadence a panel can honestly show."""
 
     def __init__(
@@ -108,13 +118,8 @@ class OpenAlarmStateCoordinator(DataUpdateCoordinator[dict[str, str]]):
         if not connected:
             self.hass.async_create_task(self.async_request_refresh())
 
-    async def _async_update_data(self) -> dict[str, dict[str, str | None]]:
-        try:
-            data = await self.client.state()
-        except InvalidAuth as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
-        except OpenAlarmError as err:
-            raise UpdateFailed(str(err)) from err
+    async def _async_update_data(self) -> AlarmStates:
+        data = await _fetch(self.client.state)
         return {
             alarm["id"]: {
                 "state": str(alarm.get("state") or "disarmed"),

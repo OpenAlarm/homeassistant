@@ -13,6 +13,10 @@ from .const import KIND_ALARM, REQUEST_TIMEOUT
 _LOGGER = logging.getLogger(__name__)
 
 
+def trace_fields(body: dict[str, Any]) -> tuple[Any, Any]:
+    return body.get("traceId"), (body.get("data") or {}).get("environment")
+
+
 class OpenAlarmError(Exception):
     """Raised when the API cannot be reached or answers unexpectedly."""
 
@@ -64,22 +68,18 @@ class OpenAlarmClient:
         if not isinstance(body, dict):
             raise OpenAlarmError("OpenAlarm returned an unexpected payload")
 
-        trace_id = body.get("traceId")
-        environment = (body.get("data") or {}).get("environment")
         _LOGGER.debug(
-            "OpenAlarm %s traceId=%s environment=%s", path, trace_id, environment
+            "OpenAlarm %s traceId=%s environment=%s", path, *trace_fields(body)
         )
         return body
 
     async def describe(self) -> dict[str, Any]:
         """Return the inventory this key can reach."""
-        body = await self._get("/v1/integration/describe")
-        return body.get("data") or {}
+        return (await self._get("/v1/integration/describe")).get("data") or {}
 
     async def state(self) -> dict[str, Any]:
         """Return the live state of every alarm this key can reach."""
-        body = await self._get("/v1/integration/state")
-        return body.get("data") or {}
+        return (await self._get("/v1/integration/state")).get("data") or {}
 
     async def act(
         self, kind: str, trigger_id: str, action: str, mode: str | None = None

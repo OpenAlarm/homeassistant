@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -21,7 +21,7 @@ from homeassistant.helpers.service import (
 )
 from homeassistant.helpers.typing import ConfigType
 
-from .api import NotFound, OpenAlarmClient, OpenAlarmError
+from .api import NotFound, OpenAlarmClient, OpenAlarmError, trace_fields
 from .const import (
     APP_URL,
     ATTR_MODE,
@@ -31,9 +31,9 @@ from .const import (
     DEFAULT_BASE_URL,
     DOMAIN,
     KIND_ALARM,
-    MODES,
     KIND_PANIC,
     MANUFACTURER,
+    MODES,
     SERVICE_ARM,
     SERVICE_CLEAR,
     SERVICE_DISARM,
@@ -50,6 +50,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.ALARM_CONTROL_PANEL]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 @dataclass
 class OpenAlarmData:
@@ -130,21 +131,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenAlarmConfigEntry) ->
     await state.async_config_entry_first_refresh()
 
     entry.runtime_data = OpenAlarmData(client=client, inventory=inventory, state=state)
+
+    @callback
+    def _inventory_changed() -> None:
+        _async_start_realtime(hass, entry)
+        _async_sync_devices(hass, entry, inventory)
+        hass.async_create_task(_async_refresh_mode_options(hass))
+
     _async_start_realtime(hass, entry)
-    entry.async_on_unload(
-        inventory.async_add_listener(lambda: _async_start_realtime(hass, entry))
-    )
     _async_sync_devices(hass, entry, inventory)
-    entry.async_on_unload(
-        inventory.async_add_listener(
-            lambda: _async_sync_devices(hass, entry, inventory)
-        )
-    )
-    entry.async_on_unload(
-        inventory.async_add_listener(
-            lambda: hass.async_create_task(_async_refresh_mode_options(hass))
-        )
-    )
+    entry.async_on_unload(inventory.async_add_listener(_inventory_changed))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await _async_refresh_mode_options(hass)
@@ -307,12 +303,13 @@ async def _run(
     mode = call.data.get(ATTR_MODE) if moded else None
 
     for target in _resolve(hass, call, kind):
-        known = target.coordinator.modes_for(target.trigger_id)
-        if mode and not any(m.get("id") == mode for m in known):
-            names = ", ".join(str(m.get("id")) for m in known)
-            raise ServiceValidationError(
-                f"{target.name} has no mode {mode}. Known modes: {names or 'none'}"
-            )
+        if mode:
+            known = target.coordinator.modes_for(target.trigger_id)
+            if not any(m.get("id") == mode for m in known):
+                names = ", ".join(str(m.get("id")) for m in known)
+                raise ServiceValidationError(
+                    f"{target.name} has no mode {mode}. Known modes: {names or 'none'}"
+                )
 
         if kind == KIND_ALARM and action == "arm":
             async_check_ready(
@@ -320,7 +317,7 @@ async def _run(
             )
 
         try:
-            body: dict[str, Any] = await target.coordinator.client.act(
+            body = await target.coordinator.client.act(
                 kind, target.trigger_id, action, mode
             )
         except NotFound as err:
@@ -335,8 +332,7 @@ async def _run(
             "openalarm.%s on %s traceId=%s environment=%s",
             action,
             target.name,
-            body.get("traceId"),
-            (body.get("data") or {}).get("environment"),
+            *trace_fields(body),
         )
 
 
@@ -345,30 +341,22 @@ def _async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, SERVICE_ARM):
         return
 
-    async def arm(call: ServiceCall) -> None:
-        await _run(hass, call, KIND_ALARM, "arm", moded=True)
+    def handler(
+        kind: str, action: str, moded: bool
+    ) -> Callable[[ServiceCall], Awaitable[None]]:
+        async def handle(call: ServiceCall) -> None:
+            await _run(hass, call, kind, action, moded)
 
-    async def disarm(call: ServiceCall) -> None:
-        await _run(hass, call, KIND_ALARM, "disarm", moded=False)
+        return handle
 
-    async def trigger(call: ServiceCall) -> None:
-        await _run(hass, call, KIND_ALARM, "trigger", moded=True)
-
-    async def clear(call: ServiceCall) -> None:
-        await _run(hass, call, KIND_ALARM, "clear", moded=False)
-
-    async def panic(call: ServiceCall) -> None:
-        await _run(hass, call, KIND_PANIC, "trigger", moded=False)
-
-    async def panic_clear(call: ServiceCall) -> None:
-        await _run(hass, call, KIND_PANIC, "clear", moded=False)
-
-    for name, handler, schema in (
-        (SERVICE_ARM, arm, MODE_SCHEMA),
-        (SERVICE_DISARM, disarm, TARGET_SCHEMA),
-        (SERVICE_TRIGGER, trigger, MODE_SCHEMA),
-        (SERVICE_CLEAR, clear, TARGET_SCHEMA),
-        (SERVICE_PANIC, panic, TARGET_SCHEMA),
-        (SERVICE_PANIC_CLEAR, panic_clear, TARGET_SCHEMA),
+    for name, kind, action, moded, schema in (
+        (SERVICE_ARM, KIND_ALARM, "arm", True, MODE_SCHEMA),
+        (SERVICE_DISARM, KIND_ALARM, "disarm", False, TARGET_SCHEMA),
+        (SERVICE_TRIGGER, KIND_ALARM, "trigger", True, MODE_SCHEMA),
+        (SERVICE_CLEAR, KIND_ALARM, "clear", False, TARGET_SCHEMA),
+        (SERVICE_PANIC, KIND_PANIC, "trigger", False, TARGET_SCHEMA),
+        (SERVICE_PANIC_CLEAR, KIND_PANIC, "clear", False, TARGET_SCHEMA),
     ):
-        hass.services.async_register(DOMAIN, name, handler, schema=schema)
+        hass.services.async_register(
+            DOMAIN, name, handler(kind, action, moded), schema=schema
+        )

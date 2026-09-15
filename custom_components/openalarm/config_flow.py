@@ -172,9 +172,8 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             api_key = user_input[CONF_API_KEY].strip()
-            base_url = DEFAULT_BASE_URL
             try:
-                locations = await self._describe(api_key, base_url)
+                locations = await self._describe(api_key, self._base_url)
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except OpenAlarmError:
@@ -199,16 +198,17 @@ class OpenAlarmConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     def _describe_location(location: dict[str, Any]) -> str:
-        alarms = len(location.get("alarms") or [])
-        panics = len(location.get("panicButtons") or [])
         name = location.get("name") or location.get("id")
-        parts = []
-        if alarms:
-            parts.append(f"{alarms} alarm" + ("s" if alarms != 1 else ""))
-        if panics:
-            parts.append(f"{panics} panic button" + ("s" if panics != 1 else ""))
+        counts = (
+            (len(location.get("alarms") or []), "alarm"),
+            (len(location.get("panicButtons") or []), "panic button"),
+        )
+        parts = [
+            f"{count} {noun}" + ("s" if count != 1 else "")
+            for count, noun in counts
+            if count
+        ]
         return f"{name} ({', '.join(parts)})" if parts else str(name)
-
 
 
 class OpenAlarmOptionsFlow(OptionsFlow):
